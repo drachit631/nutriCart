@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
 import { useNavigate } from "react-router-dom";
+import { recipesAPI, productsAPI } from "../../services/api";
 
 const RecipeIntegration = () => {
   const { user, isAuthenticated } = useAuth();
@@ -20,16 +21,10 @@ const RecipeIntegration = () => {
         setLoading(true);
 
         // Fetch recipes from database
-        const recipesResponse = await fetch(
-          "http://localhost:4000/api/recipes"
-        );
-        const recipesData = await recipesResponse.json();
+        const recipesData = await recipesAPI.getAll();
 
         // Fetch products from database
-        const productsResponse = await fetch(
-          "http://localhost:4000/api/products"
-        );
-        const productsData = await productsResponse.json();
+        const productsData = await productsAPI.getAll();
 
         console.log("Recipes from database:", recipesData);
         console.log("Products from database:", productsData);

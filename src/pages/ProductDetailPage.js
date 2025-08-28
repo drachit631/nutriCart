@@ -21,6 +21,7 @@ import {
   Plus,
   Eye,
 } from "lucide-react";
+import { productsAPI } from "../services/api";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -45,8 +46,7 @@ const ProductDetailPage = () => {
 
   const fetchProduct = async () => {
     try {
-      const response = await fetch(`http://localhost:4000/api/products/${id}`);
-      const data = await response.json();
+      const data = await productsAPI.getById(id);
       setProduct(data);
       setLoading(false);
     } catch (error) {

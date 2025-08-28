@@ -5,6 +5,7 @@ import { useToast } from "../components/ui/use-toast";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { productsAPI } from "../services/api";
 import {
   Search,
   Star,
@@ -197,9 +198,8 @@ const ProductsPage = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch("http://localhost:4000/api/products");
-      const data = await response.json();
-      setProducts(data);
+                      const data = await productsAPI.getAll();
+        setProducts(data);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching products:", error);

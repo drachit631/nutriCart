@@ -10,6 +10,7 @@ import {
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
+import { recipesAPI } from "../services/api";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
@@ -22,11 +23,7 @@ export default function RecipesPage() {
     const fetchRecipes = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:4000/api/recipes");
-        if (!response.ok) {
-          throw new Error("Failed to fetch recipes");
-        }
-        const data = await response.json();
+        const data = await recipesAPI.getAll();
         setRecipes(data);
       } catch (error) {
         console.error("Error fetching recipes:", error);
@@ -63,9 +60,12 @@ export default function RecipesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Healthy Recipes</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Healthy Recipes
+              </h1>
               <p className="mt-2 text-gray-600">
-                Discover delicious and nutritious recipes for your healthy lifestyle
+                Discover delicious and nutritious recipes for your healthy
+                lifestyle
               </p>
             </div>
             <Button
@@ -83,7 +83,10 @@ export default function RecipesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {recipes.map((recipe) => (
-            <Card key={recipe._id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            <Card
+              key={recipe._id}
+              className="overflow-hidden hover:shadow-lg transition-shadow duration-300"
+            >
               {/* Recipe Image */}
               <div className="bg-gradient-to-br from-green-400 to-blue-500 p-8 text-center">
                 <div className="text-6xl mb-4">{recipe.image}</div>
@@ -96,7 +99,7 @@ export default function RecipesPage() {
                   <p className="text-gray-600 text-sm line-clamp-2">
                     {recipe.description}
                   </p>
-                  
+
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <span>⏱️ {recipe.cookingTime || recipe.time || "N/A"}</span>
                     <span>👥 {recipe.servings} servings</span>
@@ -134,7 +137,9 @@ export default function RecipesPage() {
 
         {recipes.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No recipes available at the moment.</p>
+            <p className="text-gray-500 text-lg">
+              No recipes available at the moment.
+            </p>
           </div>
         )}
       </div>

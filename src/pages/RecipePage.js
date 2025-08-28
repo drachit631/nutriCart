@@ -11,6 +11,7 @@ import {
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
+import { recipesAPI, productsAPI } from "../services/api";
 
 export default function RecipePage() {
   const [recipe, setRecipe] = useState(null);
@@ -30,19 +31,10 @@ export default function RecipePage() {
         setLoading(true);
 
         // Fetch specific recipe from database
-        const recipeResponse = await fetch(
-          `http://localhost:4000/api/recipes/${id}`
-        );
-        if (!recipeResponse.ok) {
-          throw new Error("Recipe not found");
-        }
-        const recipeData = await recipeResponse.json();
+        const recipeData = await recipesAPI.getById(id);
 
         // Fetch all products from database
-        const productsResponse = await fetch(
-          "http://localhost:4000/api/products"
-        );
-        const productsData = await productsResponse.json();
+        const productsData = await productsAPI.getAll();
 
         setProducts(productsData);
         setRecipe(recipeData);
