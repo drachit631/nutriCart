@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "../components/ui/use-toast";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -14,222 +13,138 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem("token"));
-  const navigate = useNavigate();
 
-  // Check if user is authenticated on mount
+  // Check for existing token on app load
   useEffect(() => {
-    const checkAuth = async () => {
-      if (token) {
-        try {
-          const response = await fetch("/api/auth/me", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          });
+    const storedToken = localStorage.getItem("nutriCart_token");
+    const storedUser = localStorage.getItem("nutriCart_user");
 
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-          } else {
-            // Token is invalid, remove it
-            localStorage.removeItem("token");
-            setToken(null);
-          }
-        } catch (error) {
-          console.error("Auth check error:", error);
-          localStorage.removeItem("token");
-          setToken(null);
-        }
+    if (storedToken && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setToken(storedToken);
+        setUser(userData);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error("Error parsing stored user data:", error);
+        localStorage.removeItem("nutriCart_token");
+        localStorage.removeItem("nutriCart_user");
       }
-      setLoading(false);
-    };
-
-    checkAuth();
-  }, [token]);
+    }
+    setLoading(false);
+  }, []);
 
   const login = async (email, password) => {
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      setLoading(true);
+      const response = await authAPI.login(email, password);
 
-      const data = await response.json();
+      const { user: userData, token: authToken } = response;
 
-      if (response.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        localStorage.setItem("token", data.token);
-        toast({
-          title: "Success!",
-          description: "Welcome back to NutriCart+!",
-        });
-        navigate("/dashboard");
-        return { success: true };
-      } else {
-        toast({
-          title: "Login Failed",
-          description: data.message || "Invalid credentials",
-          variant: "destructive",
-        });
-        return { success: false, message: data.message };
-      }
+      // Store in localStorage
+      localStorage.setItem("nutriCart_token", authToken);
+      localStorage.setItem("nutriCart_user", JSON.stringify(userData));
+
+      // Update state
+      setToken(authToken);
+      setUser(userData);
+      setIsAuthenticated(true);
+
+      return { success: true, user: userData };
     } catch (error) {
       console.error("Login error:", error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-      return { success: false, message: "Network error" };
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signup = async (userData) => {
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-      });
+      setLoading(true);
+      const response = await authAPI.register(userData);
 
-      const data = await response.json();
+      const { user: newUser, token: authToken } = response;
 
-      if (response.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        localStorage.setItem("token", data.token);
-        toast({
-          title: "Welcome to NutriCart+!",
-          description: "Your account has been created successfully.",
-        });
-        navigate("/dashboard");
-        return { success: true };
-      } else {
-        toast({
-          title: "Signup Failed",
-          description: data.message || "Something went wrong",
-          variant: "destructive",
-        });
-        return { success: false, message: data.message };
-      }
+      // Store in localStorage
+      localStorage.setItem("nutriCart_token", authToken);
+      localStorage.setItem("nutriCart_user", JSON.stringify(newUser));
+
+      // Update state
+      setToken(authToken);
+      setUser(newUser);
+      setIsAuthenticated(true);
+
+      return { success: true, user: newUser };
     } catch (error) {
       console.error("Signup error:", error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-      return { success: false, message: "Network error" };
+      throw error;
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem("token");
-    toast({
-      title: "Logged Out",
-      description: "You have been logged out successfully.",
-    });
-    navigate("/");
   };
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await fetch("/api/auth/profile", {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(profileData),
-      });
+      setLoading(true);
+      const updatedUser = await authAPI.updateProfile(user.id, profileData);
 
-      const data = await response.json();
+      // Update stored user data
+      const newUserData = { ...user, ...updatedUser };
+      localStorage.setItem("nutriCart_user", JSON.stringify(newUserData));
 
-      if (response.ok) {
-        setUser(data.user);
-        toast({
-          title: "Profile Updated",
-          description: "Your profile has been updated successfully.",
-        });
-        return { success: true };
-      } else {
-        toast({
-          title: "Update Failed",
-          description: data.message || "Something went wrong",
-          variant: "destructive",
-        });
-        return { success: false, message: data.message };
-      }
+      // Update state
+      setUser(newUserData);
+
+      return { success: true, user: newUserData };
     } catch (error) {
       console.error("Profile update error:", error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-      return { success: false, message: "Network error" };
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const changePassword = async (currentPassword, newPassword) => {
+  const logout = () => {
+    // Clear localStorage
+    localStorage.removeItem("nutriCart_token");
+    localStorage.removeItem("nutriCart_user");
+
+    // Clear state
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  const refreshUser = async () => {
+    if (!user?.id) return;
+
     try {
-      const response = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      const userData = await authAPI.getUser(user.id);
+      const newUserData = { ...user, ...userData };
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast({
-          title: "Password Changed",
-          description: "Your password has been updated successfully.",
-        });
-        return { success: true };
-      } else {
-        toast({
-          title: "Password Change Failed",
-          description: data.message || "Something went wrong",
-          variant: "destructive",
-        });
-        return { success: false, message: data.message };
-      }
+      localStorage.setItem("nutriCart_user", JSON.stringify(newUserData));
+      setUser(newUserData);
     } catch (error) {
-      console.error("Password change error:", error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-      return { success: false, message: "Network error" };
+      console.error("Error refreshing user data:", error);
+      // If refresh fails, logout user
+      logout();
     }
   };
 
   const value = {
     user,
     token,
+    isAuthenticated,
     loading,
     login,
     signup,
     logout,
     updateProfile,
-    changePassword,
-    isAuthenticated: !!user,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
