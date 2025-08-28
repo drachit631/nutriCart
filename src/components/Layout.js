@@ -19,7 +19,7 @@ import {
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { getCartItemCount } = useCart();
+  const { cart } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -153,9 +153,9 @@ const Layout = ({ children }) => {
               className="relative p-2 text-gray-400 hover:text-gray-500"
             >
               <ShoppingCart className="h-6 w-6" />
-              {getCartItemCount() > 0 && (
+              {cart.count > 0 && (
                 <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-primary rounded-full">
-                  {getCartItemCount()}
+                  {cart.count}
                 </span>
               )}
             </Link>
