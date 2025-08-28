@@ -231,8 +231,7 @@ export default function RecipePage() {
         variant: "default",
       });
 
-      // Navigate to cart
-      navigate("/cart");
+      // Stay on current page - no navigation needed
     } catch (error) {
       console.error("Error adding ingredients to cart:", error);
       toast({
@@ -616,7 +615,7 @@ export default function RecipePage() {
                       })
                     }
                   >
-                    Order All Missing Ingredients
+                    Order Missing Ingredients
                   </Button>
                 </div>
               </CardContent>
