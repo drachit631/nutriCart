@@ -18,6 +18,8 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState({ items: [], total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
   const [updatingItems, setUpdatingItems] = useState(new Set()); // Track which items are being updated
+  const [isBatchAdding, setIsBatchAdding] = useState(false); // Track batch operations
+  const [isInitialLoading, setIsInitialLoading] = useState(false); // Track initial cart load
 
   // Debug cart state changes
   useEffect(() => {
@@ -26,6 +28,17 @@ export const CartProvider = ({ children }) => {
 
   // Load cart from API when user is authenticated
   useEffect(() => {
+    if (isInitialLoading) {
+      console.log("⚠️ Cart already loading, skipping duplicate load");
+      return;
+    }
+
+    console.log("🔄 Cart useEffect triggered:", {
+      isAuthenticated,
+      userId: user?.id,
+    });
+    setIsInitialLoading(true);
+
     if (isAuthenticated && user?.id) {
       // Check if there are local cart items to sync
       const localCart = localStorage.getItem("nutriCart_localCart");
@@ -44,6 +57,11 @@ export const CartProvider = ({ children }) => {
       // Load local cart when user is not authenticated
       loadLocalCart();
     }
+
+    // Reset initial loading flag after a delay
+    setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 1000);
   }, [isAuthenticated, user?.id]);
 
   // Sync local cart items with backend when user logs in
@@ -193,6 +211,72 @@ export const CartProvider = ({ children }) => {
         console.error("Backend sync failed (but local cart works):", error);
         // Don't show error to user since local cart already worked
       }
+    }
+  };
+
+  // Batch add multiple items to cart - useful for "Order Missing Ingredients"
+  const addMultipleToCart = async (items) => {
+    console.log("CartContext: addMultipleToCart called with:", items);
+
+    // Prevent multiple simultaneous batch operations
+    if (isBatchAdding) {
+      console.log(
+        "⚠️ Batch operation already in progress, ignoring duplicate call"
+      );
+      throw new Error("Batch operation already in progress");
+    }
+
+    setIsBatchAdding(true);
+
+    // Start with current cart
+    let newCart = { ...cart };
+
+    // Process each item
+    for (const { productId, quantity = 1, price = 0 } of items) {
+      const existingItem = newCart.items.find(
+        (item) => item.productId === productId
+      );
+
+      if (existingItem) {
+        newCart.items = newCart.items.map((item) =>
+          item.productId === productId
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      } else {
+        newCart.items = [...newCart.items, { productId, quantity, price }];
+      }
+    }
+
+    // Calculate totals once at the end
+    newCart.count = newCart.items.reduce((sum, item) => sum + item.quantity, 0);
+    newCart.total = newCart.items.reduce(
+      (sum, item) => sum + (item.price || 0) * item.quantity,
+      0
+    );
+
+    // Update cart state immediately
+    console.log("Updating cart state with multiple items:", newCart);
+    setCart(newCart);
+    saveLocalCart(newCart);
+
+    try {
+      // For logged-in users, sync to backend
+      if (isAuthenticated && user?.id) {
+        console.log("Background sync multiple items to backend...");
+        for (const { productId, quantity } of items) {
+          await cartAPI.addItem(user.id, productId, quantity);
+        }
+        console.log("Backend sync successful for all items");
+      }
+
+      return items.length; // Return count of items added
+    } catch (error) {
+      console.error("Backend sync failed for some items:", error);
+      // Don't show error to user since local cart already worked
+      return items.length; // Still return count since local cart worked
+    } finally {
+      setIsBatchAdding(false);
     }
   };
 
@@ -386,6 +470,7 @@ export const CartProvider = ({ children }) => {
     cart,
     loading,
     addToCart,
+    addMultipleToCart,
     updateQuantity,
     removeFromCart,
     clearCart,

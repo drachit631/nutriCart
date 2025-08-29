@@ -16,8 +16,16 @@ import { recipesAPI, productsAPI } from "../services/api";
 export default function RecipePage() {
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAddingIngredients, setIsAddingIngredients] = useState(false);
   const { id } = useParams();
-  const { addToCart, removeFromCart, updateQuantity, cart } = useCart();
+  const {
+    addToCart,
+    addMultipleToCart,
+    removeFromCart,
+    updateQuantity,
+    cart,
+    loading: cartLoading,
+  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -189,6 +197,27 @@ export default function RecipePage() {
 
   const handleOrderMissingIngredients = async () => {
     try {
+      // Prevent multiple simultaneous calls
+      if (isAddingIngredients) {
+        console.log("⚠️ Already adding ingredients, ignoring duplicate call");
+        return;
+      }
+
+      // Check if cart is still loading
+      if (cartLoading) {
+        toast({
+          title: "Please Wait",
+          description: "Cart is loading. Please try again in a moment.",
+          variant: "default",
+        });
+        return;
+      }
+
+      setIsAddingIngredients(true);
+
+      console.log("🛒 Current cart state:", cart);
+      console.log("🛒 Cart items:", cart.items);
+
       // Get ALL ingredients that have matching products
       const availableIngredients = recipe.ingredients
         .map((ingredient) => {
@@ -205,6 +234,8 @@ export default function RecipePage() {
         })
         .filter(Boolean);
 
+      console.log("🥕 Available ingredients:", availableIngredients);
+
       if (availableIngredients.length === 0) {
         toast({
           title: "No Ingredients Available",
@@ -220,8 +251,14 @@ export default function RecipePage() {
         const cartItem = cart.items.find(
           (item) => item.productId === product._id
         );
+        console.log(`🔍 Checking ${product.name} (${product._id}):`, {
+          inCart: !!cartItem,
+          cartItem: cartItem,
+        });
         return !cartItem; // Not in cart
       });
+
+      console.log("❌ Missing ingredients:", missingIngredients);
 
       if (missingIngredients.length === 0) {
         toast({
@@ -234,18 +271,33 @@ export default function RecipePage() {
 
       console.log("Adding missing ingredients to cart:", missingIngredients);
 
-      // Add ONLY missing ingredients to cart simultaneously
-      const addPromises = missingIngredients.map(({ product }) =>
-        addToCart(product._id, 1, product.price)
-      );
+      // Prepare items for batch add
+      const itemsToAdd = missingIngredients.map(({ product }) => ({
+        productId: product._id,
+        quantity: 1,
+        price: product.price,
+      }));
 
-      await Promise.all(addPromises);
+      console.log("Items to add to cart:", itemsToAdd);
 
-      toast({
-        title: "Missing Ingredients Added",
-        description: `${missingIngredients.length} missing ingredients added to cart!`,
-        variant: "default",
-      });
+      // Use batch add function to add all items at once
+      try {
+        const addedCount = await addMultipleToCart(itemsToAdd);
+        console.log(`Successfully added ${addedCount} ingredients to cart`);
+
+        toast({
+          title: "Missing Ingredients Added",
+          description: `${addedCount} missing ingredients added to cart!`,
+          variant: "default",
+        });
+      } catch (error) {
+        console.error("Failed to add ingredients:", error);
+        toast({
+          title: "Error",
+          description: "Failed to add ingredients to cart. Please try again.",
+          variant: "destructive",
+        });
+      }
 
       // Stay on current page - no navigation needed
     } catch (error) {
@@ -256,6 +308,8 @@ export default function RecipePage() {
           "Failed to add some ingredients to cart. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsAddingIngredients(false);
     }
   };
 
@@ -622,6 +676,8 @@ export default function RecipePage() {
                     className="w-full"
                     onClick={handleOrderMissingIngredients}
                     disabled={
+                      cartLoading ||
+                      isAddingIngredients ||
                       !recipe.ingredients ||
                       recipe.ingredients.length === 0 ||
                       recipe.ingredients.every((ingredient) => {
@@ -643,7 +699,11 @@ export default function RecipePage() {
                       })
                     }
                   >
-                    Order Missing Ingredients
+                    {cartLoading
+                      ? "Loading Cart..."
+                      : isAddingIngredients
+                      ? "Adding Ingredients..."
+                      : "Order Missing Ingredients"}
                   </Button>
                 </div>
               </CardContent>

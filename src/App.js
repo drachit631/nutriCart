@@ -21,6 +21,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import RecipesPage from "./pages/RecipesPage";
 import RecipePage from "./pages/RecipePage";
 import PricingPage from "./pages/PricingPage";
+import OrdersPage from "./pages/OrdersPage";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/recipes" element={<RecipesPage />} />
                 <Route path="/recipes/:id" element={<RecipePage />} />
                 <Route path="/pricing" element={<PricingPage />} />

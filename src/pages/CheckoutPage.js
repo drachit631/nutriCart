@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,6 +13,32 @@ import {
 import { Input } from "../components/ui/input";
 import { toast } from "../components/ui/use-toast";
 import { productsAPI, ordersAPI } from "../services/api";
+
+// FormInput component defined outside to prevent recreation
+const FormInput = React.memo(
+  ({
+    name,
+    placeholder,
+    type = "text",
+    className = "",
+    value,
+    onChange,
+    ...props
+  }) => (
+    <div className="space-y-1">
+      <input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        value={value || ""}
+        onChange={onChange}
+        className={`flex h-10 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${className}`}
+        autoComplete="off"
+        {...props}
+      />
+    </div>
+  )
+);
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
@@ -72,13 +98,13 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
+    setFormData((prevData) => ({
+      ...prevData,
       [name]: value,
     }));
-  };
+  }, []);
 
   const handlePayment = async (e) => {
     e.preventDefault();
@@ -137,12 +163,12 @@ export default function CheckoutPage() {
       toast({
         title: "Payment Successful! 🎉",
         description:
-          "Your order has been placed successfully. Check your orders in the dashboard.",
+          "Your order has been placed successfully. Redirecting to orders page...",
         variant: "default",
       });
 
       // Navigate to orders page
-      navigate("/dashboard");
+      navigate("/orders");
     } catch (error) {
       console.error("Payment error:", error);
       toast({
@@ -160,29 +186,6 @@ export default function CheckoutPage() {
   const shipping = 0; // Free shipping
   const tax = Math.round(subtotal * 0.18); // 18% GST
   const total = subtotal + shipping + tax;
-
-  // Helper component for input with validation
-  const FormInput = ({
-    name,
-    placeholder,
-    type = "text",
-    className = "",
-    maxLength,
-    ...props
-  }) => (
-    <div className="space-y-1">
-      <Input
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        value={formData[name]}
-        onChange={handleInputChange}
-        maxLength={maxLength}
-        className={className}
-        {...props}
-      />
-    </div>
-  );
 
   // Redirect if cart is empty
   if (!cart.items || cart.items.length === 0) {
@@ -287,27 +290,28 @@ export default function CheckoutPage() {
                       <FormInput
                         name="cardNumber"
                         placeholder="Card Number (1234 5678 9012 3456)"
-                        maxLength={19}
-                        required
+                        value={formData.cardNumber}
+                        onChange={handleInputChange}
                       />
                       <div className="grid grid-cols-2 gap-4">
                         <FormInput
                           name="expiryDate"
                           placeholder="MM/YY"
-                          maxLength={7}
-                          required
+                          value={formData.expiryDate}
+                          onChange={handleInputChange}
                         />
                         <FormInput
                           name="cvv"
                           placeholder="CVV"
-                          maxLength={4}
-                          required
+                          value={formData.cvv}
+                          onChange={handleInputChange}
                         />
                       </div>
                       <FormInput
                         name="cardholderName"
                         placeholder="Cardholder Name"
-                        required
+                        value={formData.cardholderName}
+                        onChange={handleInputChange}
                       />
                     </>
                   )}
@@ -318,7 +322,6 @@ export default function CheckoutPage() {
                       placeholder="UPI ID (e.g., user@upi)"
                       value={formData.upiId}
                       onChange={handleInputChange}
-                      required
                     />
                   )}
 
@@ -330,24 +333,35 @@ export default function CheckoutPage() {
                     <FormInput
                       name="address"
                       placeholder="Street Address (House/Flat No., Street, Area)"
-                      required
+                      value={formData.address}
+                      onChange={handleInputChange}
                     />
                     <div className="grid grid-cols-2 gap-4">
-                      <FormInput name="city" placeholder="City" required />
-                      <FormInput name="state" placeholder="State" required />
+                      <FormInput
+                        name="city"
+                        placeholder="City"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                      />
+                      <FormInput
+                        name="state"
+                        placeholder="State"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <FormInput
                         name="zipCode"
-                        placeholder="ZIP Code (6 digits)"
-                        maxLength={6}
-                        required
+                        placeholder="ZIP Code"
+                        value={formData.zipCode}
+                        onChange={handleInputChange}
                       />
                       <FormInput
                         name="phone"
-                        placeholder="Phone Number (10 digits)"
-                        maxLength={10}
-                        required
+                        placeholder="Phone Number"
+                        value={formData.phone}
+                        onChange={handleInputChange}
                       />
                     </div>
                   </div>
