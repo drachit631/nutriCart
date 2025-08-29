@@ -52,6 +52,12 @@ export function Navigation() {
               Products
             </button>
             <button
+              onClick={() => navigate("/recipes")}
+              className="text-gray-700 hover:text-green-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Recipes
+            </button>
+            <button
               onClick={() => navigate("/diet-plans")}
               className="text-gray-700 hover:text-green-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >

@@ -67,6 +67,7 @@ const ProductsPage = () => {
     isInCart,
     getItemQuantity,
     isItemUpdating,
+    updateLocalCartPrices,
   } = useCart();
   const { toast } = useToast();
 
@@ -198,8 +199,9 @@ const ProductsPage = () => {
 
   const fetchProducts = async () => {
     try {
-                      const data = await productsAPI.getAll();
-        setProducts(data);
+      const data = await productsAPI.getAll();
+      setProducts(data);
+      updateLocalCartPrices(data);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -250,7 +252,7 @@ const ProductsPage = () => {
 
   const handleAddToCart = async (product) => {
     try {
-      await addToCart(product._id, 1);
+      await addToCart(product._id, 1, product.price);
       toast({
         title: "Added to cart!",
         description: `${product.name} has been added to your cart.`,
@@ -266,13 +268,22 @@ const ProductsPage = () => {
   };
 
   const handleQuantityChange = async (productId, newQuantity) => {
+    console.log(
+      "ProductsPage: handleQuantityChange called with:",
+      productId,
+      newQuantity
+    );
+
     try {
       if (newQuantity <= 0) {
+        console.log("Removing product from cart (quantity 0)");
         await updateQuantity(productId, 0);
       } else {
+        console.log("Updating product quantity to:", newQuantity);
         await updateQuantity(productId, newQuantity);
       }
     } catch (error) {
+      console.error("Error in handleQuantityChange:", error);
       toast({
         title: "Error",
         description: "Failed to update quantity. Please try again.",
@@ -331,6 +342,54 @@ const ProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+      {/* Navigation Header */}
+      <div className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 text-gray-600 hover:text-green-600"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+              Back to Home
+            </Button>
+
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate("/cart")}
+                className="relative text-gray-600 hover:text-green-600"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {/* Cart badge */}
+                <span className="absolute -top-2 -right-2 bg-green-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {/* This will show total items in cart */}
+                  {products.reduce((total, product) => {
+                    return (
+                      total +
+                      (isInCart(product._id) ? getItemQuantity(product._id) : 0)
+                    );
+                  }, 0)}
+                </span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section - Matching Website Design */}
       <div className="relative overflow-hidden bg-gradient-to-r from-green-600 to-blue-600 text-white py-20">
         {/* Background Elements */}
@@ -861,16 +920,26 @@ const ProductsPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
+                            onClick={() => {
+                              console.log(
+                                "ProductsPage: Minus button clicked for product:",
+                                product._id,
+                                "current quantity:",
+                                getItemQuantity(product._id)
+                              );
                               handleQuantityChange(
                                 product._id,
                                 getItemQuantity(product._id) - 1
-                              )
-                            }
+                              );
+                            }}
                             disabled={isItemUpdating(product._id)}
                             className="flex-1 border-green-300 text-green-700 hover:bg-green-100"
                           >
-                            <Minus className="w-4 h-4" />
+                            {isItemUpdating(product._id) ? (
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Minus className="w-4 h-4" />
+                            )}
                           </Button>
                           <span className="text-center font-semibold min-w-[2rem]">
                             {getItemQuantity(product._id)}
@@ -878,16 +947,26 @@ const ProductsPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
+                            onClick={() => {
+                              console.log(
+                                "ProductsPage: Plus button clicked for product:",
+                                product._id,
+                                "current quantity:",
+                                getItemQuantity(product._id)
+                              );
                               handleQuantityChange(
                                 product._id,
                                 getItemQuantity(product._id) + 1
-                              )
-                            }
+                              );
+                            }}
                             disabled={isItemUpdating(product._id)}
                             className="flex-1 border-green-300 text-green-700 hover:bg-green-100"
                           >
-                            <Plus className="w-4 h-4" />
+                            {isItemUpdating(product._id) ? (
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
                           </Button>
                         </div>
                       </div>

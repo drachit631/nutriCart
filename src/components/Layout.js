@@ -27,6 +27,7 @@ const Layout = ({ children }) => {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Diet Plans", href: "/diet-plans", icon: Package },
     { name: "Products", href: "/products", icon: ShoppingCart },
+    { name: "Recipes", href: "/recipes", icon: Package },
     { name: "Orders", href: "/orders", icon: Calendar },
     { name: "Subscriptions", href: "/subscriptions", icon: Calendar },
     { name: "Profile", href: "/profile", icon: User },

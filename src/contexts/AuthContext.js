@@ -25,6 +25,25 @@ export const AuthProvider = ({ children }) => {
     if (storedToken && storedUser) {
       try {
         const userData = JSON.parse(storedUser);
+
+        // For demo purposes, tokens are valid for a long time (7 days)
+        // In production, you'd validate with the server
+        const tokenParts = storedToken.split("-");
+        if (tokenParts.length >= 3) {
+          const tokenTimestamp = parseInt(tokenParts[tokenParts.length - 1]);
+          const tokenAge = Date.now() - tokenTimestamp;
+          const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days (much longer for better UX)
+
+          if (tokenAge > maxAge) {
+            console.log("Token expired, clearing authentication");
+            localStorage.removeItem("nutriCart_token");
+            localStorage.removeItem("nutriCart_user");
+            setLoading(false);
+            return;
+          }
+        }
+
+        console.log("Restoring authentication from localStorage");
         setToken(storedToken);
         setUser(userData);
         setIsAuthenticated(true);
@@ -33,6 +52,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("nutriCart_token");
         localStorage.removeItem("nutriCart_user");
       }
+    } else {
+      console.log("No stored authentication found");
     }
     setLoading(false);
   }, []);
@@ -90,6 +111,11 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     try {
       setLoading(true);
+
+      if (!user?.id) {
+        throw new Error("User ID not found. Please login again.");
+      }
+
       const updatedUser = await authAPI.updateProfile(user.id, profileData);
 
       // Update stored user data

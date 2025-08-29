@@ -57,7 +57,7 @@ const ProductDetailPage = () => {
 
   const handleAddToCart = async () => {
     try {
-      await addToCart(product._id, quantity);
+      await addToCart(product._id, quantity, product.price);
       toast({
         title: "Added to cart!",
         description: `${product.name} has been added to your cart.`,
@@ -282,35 +282,7 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            {/* Quantity Selector */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center border border-gray-300 rounded-lg">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleQuantityChange(quantity - 1)}
-                    disabled={quantity <= 1}
-                    className="px-3 py-2 hover:bg-gray-100"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <span className="px-4 py-2 text-lg font-semibold min-w-[3rem] text-center">
-                    {quantity}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleQuantityChange(quantity + 1)}
-                    className="px-3 py-2 hover:bg-gray-100"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <span className="text-gray-500">{product.unit} available</span>
-              </div>
-            </div>
+
 
             {/* Add to Cart Section */}
             <div className="space-y-4">
@@ -325,7 +297,7 @@ const ProductDetailPage = () => {
                   <div className="flex gap-3">
                     <Button
                       onClick={() =>
-                        handleQuantityChange(getItemQuantity(product._id) - 1)
+                        updateQuantity(product._id, getItemQuantity(product._id) - 1)
                       }
                       disabled={isItemUpdating(product._id)}
                       variant="outline"
@@ -336,7 +308,7 @@ const ProductDetailPage = () => {
                     </Button>
                     <Button
                       onClick={() =>
-                        handleQuantityChange(getItemQuantity(product._id) + 1)
+                        updateQuantity(product._id, getItemQuantity(product._id) + 1)
                       }
                       disabled={isItemUpdating(product._id)}
                       variant="outline"

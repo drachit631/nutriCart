@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,13 +12,16 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { toast } from "../components/ui/use-toast";
+import { productsAPI, ordersAPI } from "../services/api";
 
 export default function CheckoutPage() {
-  const { cart } = useCart();
+  const { cart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [loading, setLoading] = useState(false);
+  const [productDetails, setProductDetails] = useState({});
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   const [formData, setFormData] = useState({
     cardNumber: "",
@@ -31,6 +34,43 @@ export default function CheckoutPage() {
     zipCode: "",
     phone: "",
   });
+
+  useEffect(() => {
+    loadProductDetails();
+  }, [cart.items]);
+
+  const loadProductDetails = async () => {
+    if (cart.items.length === 0) {
+      setLoadingProducts(false);
+      return;
+    }
+
+    try {
+      setLoadingProducts(true);
+      const productIds = cart.items.map((item) => item.productId);
+      const products = await Promise.all(
+        productIds.map((id) => productsAPI.getById(id))
+      );
+
+      const productMap = {};
+      products.forEach((product) => {
+        if (product) {
+          productMap[product._id] = product;
+        }
+      });
+
+      setProductDetails(productMap);
+    } catch (error) {
+      console.error("Error loading product details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load product details.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -55,23 +95,119 @@ export default function CheckoutPage() {
 
     setLoading(true);
 
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      // Create order data
+      const orderData = {
+        userId: user.id,
+        items: cart.items.map((item) => ({
+          productId: item.productId,
+          productName: productDetails[item.productId]?.name || "Product",
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+        })),
+        subtotal: subtotal,
+        tax: tax,
+        shipping: shipping,
+        total: total,
+        shippingAddress: {
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          phone: formData.phone,
+        },
+        paymentMethod: paymentMethod,
+        paymentDetails: {
+          cardNumber: formData.cardNumber.slice(-4), // Store only last 4 digits
+          cardholderName: formData.cardholderName,
+        },
+      };
+
+      // Simulate payment processing
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Create order in backend
+      await ordersAPI.createOrder(user.id, orderData);
+
+      // Clear the cart
+      await clearCart();
+
+      // Show success message
       toast({
-        title: "Order Placed Successfully!",
+        title: "Payment Successful! 🎉",
         description:
-          "Your order has been confirmed. You will receive an email confirmation shortly.",
+          "Your order has been placed successfully. Check your orders in the dashboard.",
         variant: "default",
       });
-      setLoading(false);
+
+      // Navigate to orders page
       navigate("/dashboard");
-    }, 2000);
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast({
+        title: "Payment Failed",
+        description:
+          "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const subtotal = cart.total || 0;
   const shipping = 0; // Free shipping
   const tax = Math.round(subtotal * 0.18); // 18% GST
   const total = subtotal + shipping + tax;
+
+  // Helper component for input with validation
+  const FormInput = ({
+    name,
+    placeholder,
+    type = "text",
+    className = "",
+    maxLength,
+    ...props
+  }) => (
+    <div className="space-y-1">
+      <Input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        value={formData[name]}
+        onChange={handleInputChange}
+        maxLength={maxLength}
+        className={className}
+        {...props}
+      />
+    </div>
+  );
+
+  // Redirect if cart is empty
+  if (!cart.items || cart.items.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🛒</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Your cart is empty
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Add some products to your cart before checkout.
+            </p>
+            <Button
+              onClick={() => navigate("/products")}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Continue Shopping
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -148,34 +284,29 @@ export default function CheckoutPage() {
 
                   {paymentMethod === "card" && (
                     <>
-                      <Input
+                      <FormInput
                         name="cardNumber"
-                        placeholder="Card Number"
-                        value={formData.cardNumber}
-                        onChange={handleInputChange}
+                        placeholder="Card Number (1234 5678 9012 3456)"
+                        maxLength={19}
                         required
                       />
                       <div className="grid grid-cols-2 gap-4">
-                        <Input
+                        <FormInput
                           name="expiryDate"
                           placeholder="MM/YY"
-                          value={formData.expiryDate}
-                          onChange={handleInputChange}
+                          maxLength={7}
                           required
                         />
-                        <Input
+                        <FormInput
                           name="cvv"
                           placeholder="CVV"
-                          value={formData.cvv}
-                          onChange={handleInputChange}
+                          maxLength={4}
                           required
                         />
                       </div>
-                      <Input
+                      <FormInput
                         name="cardholderName"
                         placeholder="Cardholder Name"
-                        value={formData.cardholderName}
-                        onChange={handleInputChange}
                         required
                       />
                     </>
@@ -196,42 +327,26 @@ export default function CheckoutPage() {
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
                       Shipping Address
                     </h3>
-                    <Input
+                    <FormInput
                       name="address"
-                      placeholder="Street Address"
-                      value={formData.address}
-                      onChange={handleInputChange}
+                      placeholder="Street Address (House/Flat No., Street, Area)"
                       required
                     />
                     <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        name="city"
-                        placeholder="City"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        required
-                      />
-                      <Input
-                        name="state"
-                        placeholder="State"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <FormInput name="city" placeholder="City" required />
+                      <FormInput name="state" placeholder="State" required />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <Input
+                      <FormInput
                         name="zipCode"
-                        placeholder="ZIP Code"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
+                        placeholder="ZIP Code (6 digits)"
+                        maxLength={6}
                         required
                       />
-                      <Input
+                      <FormInput
                         name="phone"
-                        placeholder="Phone Number"
-                        value={formData.phone}
-                        onChange={handleInputChange}
+                        placeholder="Phone Number (10 digits)"
+                        maxLength={10}
                         required
                       />
                     </div>
@@ -262,14 +377,29 @@ export default function CheckoutPage() {
                   <h4 className="font-medium text-gray-900">
                     Items ({cart.count})
                   </h4>
-                  {cart.items.map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <span className="text-gray-600">
-                        {item.quantity} × Product
-                      </span>
-                      <span>₹{item.price * item.quantity}</span>
+                  {loadingProducts ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto"></div>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Loading products...
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    cart.items.map((item, index) => {
+                      const product = productDetails[item.productId];
+                      return (
+                        <div
+                          key={index}
+                          className="flex justify-between text-sm"
+                        >
+                          <span className="text-gray-600">
+                            {item.quantity} × {product?.name || "Product"}
+                          </span>
+                          <span>₹{(item.price || 0) * item.quantity}</span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 <hr />

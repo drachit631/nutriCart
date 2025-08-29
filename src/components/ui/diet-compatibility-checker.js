@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./button";
 import {
@@ -10,6 +10,7 @@ import {
 } from "./card";
 import { Badge } from "./badge";
 import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { dietPlansAPI, recipesAPI } from "../../services/api";
 
 export function DietCompatibilityChecker() {
   const navigate = useNavigate();
@@ -27,6 +28,29 @@ export function DietCompatibilityChecker() {
     cookingExperience: "",
   });
   const [results, setResults] = useState(null);
+  const [dietPlans, setDietPlans] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadDietPlansAndRecipes();
+  }, []);
+
+  const loadDietPlansAndRecipes = async () => {
+    try {
+      setLoading(true);
+      const [dietPlansData, recipesData] = await Promise.all([
+        dietPlansAPI.getAll(),
+        recipesAPI.getAll(),
+      ]);
+      setDietPlans(dietPlansData);
+      setRecipes(recipesData);
+    } catch (error) {
+      console.error("Error loading diet plans and recipes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const healthGoalsOptions = [
     "Weight Loss",
@@ -96,88 +120,177 @@ export function DietCompatibilityChecker() {
   };
 
   const calculateDietRecommendations = () => {
-    // Simple algorithm to determine diet recommendations
     const recommendations = [];
+    const compatibleRecipes = [];
 
-    if (formData.healthGoals.includes("Weight Loss")) {
-      if (formData.dietaryRestrictions.includes("Low-Carb")) {
+    // Find diet plans that match user criteria
+    dietPlans.forEach((plan) => {
+      let compatibility = 50; // Base compatibility
+      let matchingFactors = [];
+
+      // Check health goals compatibility
+      if (
+        formData.healthGoals.includes("Weight Loss") &&
+        (plan.name.toLowerCase().includes("weight loss") ||
+          plan.name.toLowerCase().includes("keto") ||
+          plan.suitableFor?.includes("weight-loss"))
+      ) {
+        compatibility += 20;
+        matchingFactors.push("Weight loss focused");
+      }
+
+      if (
+        formData.healthGoals.includes("Heart Health") &&
+        (plan.name.toLowerCase().includes("mediterranean") ||
+          plan.name.toLowerCase().includes("heart") ||
+          plan.suitableFor?.includes("heart-health"))
+      ) {
+        compatibility += 20;
+        matchingFactors.push("Heart healthy");
+      }
+
+      if (
+        formData.healthGoals.includes("Muscle Building") &&
+        (plan.name.toLowerCase().includes("protein") ||
+          plan.name.toLowerCase().includes("muscle") ||
+          plan.suitableFor?.includes("muscle-gain"))
+      ) {
+        compatibility += 20;
+        matchingFactors.push("High protein");
+      }
+
+      // Check dietary restrictions
+      if (
+        formData.dietaryRestrictions.includes("Vegetarian") &&
+        (plan.name.toLowerCase().includes("vegetarian") ||
+          plan.suitableFor?.includes("vegetarian"))
+      ) {
+        compatibility += 15;
+        matchingFactors.push("Vegetarian friendly");
+      }
+
+      if (
+        formData.dietaryRestrictions.includes("Vegan") &&
+        (plan.name.toLowerCase().includes("vegan") ||
+          plan.suitableFor?.includes("vegan"))
+      ) {
+        compatibility += 15;
+        matchingFactors.push("Vegan friendly");
+      }
+
+      if (
+        formData.dietaryRestrictions.includes("Gluten-Free") &&
+        (plan.name.toLowerCase().includes("gluten") ||
+          plan.suitableFor?.includes("gluten-free"))
+      ) {
+        compatibility += 15;
+        matchingFactors.push("Gluten-free");
+      }
+
+      // Budget compatibility
+      if (
+        formData.budget.includes("Budget-friendly") &&
+        plan.budget === "low"
+      ) {
+        compatibility += 10;
+        matchingFactors.push("Budget friendly");
+      }
+
+      if (formData.budget.includes("Premium") && plan.budget === "high") {
+        compatibility += 10;
+        matchingFactors.push("Premium quality");
+      }
+
+      // Only include plans with decent compatibility
+      if (compatibility >= 60) {
         recommendations.push({
-          name: "Keto Diet",
-          compatibility: 95,
-          description: "High-fat, low-carb diet perfect for weight loss",
-          benefits: [
-            "Rapid weight loss",
-            "Increased energy",
-            "Stable blood sugar",
-          ],
-          color: "from-purple-500 to-pink-500",
-        });
-      } else {
-        recommendations.push({
-          name: "Calorie Deficit",
-          compatibility: 90,
-          description: "Balanced diet with reduced calories for weight loss",
-          benefits: [
-            "Sustainable weight loss",
-            "Flexible food choices",
-            "Easy to follow",
-          ],
-          color: "from-blue-500 to-green-500",
+          id: plan._id,
+          name: plan.name,
+          compatibility: Math.min(compatibility, 98),
+          description:
+            plan.description ||
+            plan.summary ||
+            "Personalized diet plan tailored to your needs",
+          benefits:
+            matchingFactors.length > 0
+              ? matchingFactors
+              : plan.benefits || [
+                  "Health improvement",
+                  "Sustainable eating",
+                  "Nutritious meals",
+                ],
+          color: getColorForPlan(plan.name),
+          duration: plan.duration,
+          difficulty: plan.difficulty,
+          realData: true,
         });
       }
-    }
+    });
 
-    if (formData.healthGoals.includes("Heart Health")) {
-      recommendations.push({
-        name: "Mediterranean Diet",
-        compatibility: 92,
-        description:
-          "Heart-healthy diet rich in fruits, vegetables, and healthy fats",
-        benefits: ["Heart health", "Longevity", "Brain function"],
-        color: "from-green-500 to-blue-500",
-      });
-    }
+    // Find compatible recipes
+    recipes.forEach((recipe) => {
+      let isCompatible = true;
 
-    if (formData.healthGoals.includes("Muscle Building")) {
-      recommendations.push({
-        name: "High-Protein Diet",
-        compatibility: 88,
-        description: "Protein-rich diet to support muscle growth and recovery",
-        benefits: ["Muscle building", "Recovery", "Strength gains"],
-        color: "from-orange-500 to-red-500",
-      });
-    }
+      // Check dietary restrictions
+      if (
+        formData.dietaryRestrictions.includes("Vegetarian") &&
+        recipe.dietCompatible &&
+        !recipe.dietCompatible.includes("vegetarian")
+      ) {
+        isCompatible = false;
+      }
 
-    if (formData.dietaryRestrictions.includes("Vegetarian")) {
-      recommendations.push({
-        name: "Plant-Based Diet",
-        compatibility: 85,
-        description: "Nutritious vegetarian diet with protein alternatives",
-        benefits: [
-          "Environmental friendly",
-          "Heart health",
-          "Digestive health",
-        ],
-        color: "from-green-400 to-emerald-500",
-      });
-    }
+      if (
+        formData.dietaryRestrictions.includes("Vegan") &&
+        recipe.dietCompatible &&
+        !recipe.dietCompatible.includes("vegan")
+      ) {
+        isCompatible = false;
+      }
 
-    // Default recommendation if none match
+      if (isCompatible) {
+        compatibleRecipes.push(recipe);
+      }
+    });
+
+    // Sort by compatibility
+    recommendations.sort((a, b) => b.compatibility - a.compatibility);
+
+    // If no plans match well, add a default recommendation
     if (recommendations.length === 0) {
       recommendations.push({
-        name: "Balanced Nutrition",
-        compatibility: 80,
-        description: "Well-rounded diet focusing on whole foods and balance",
-        benefits: ["Overall health", "Sustainable", "Easy to maintain"],
-        color: "from-gray-500 to-blue-500",
+        name: "Balanced Nutrition Plan",
+        compatibility: 75,
+        description:
+          "A well-rounded approach to healthy eating based on your preferences",
+        benefits: [
+          "Personalized to your goals",
+          "Sustainable lifestyle",
+          "Balanced nutrition",
+        ],
+        color: "from-blue-500 to-green-500",
+        realData: false,
       });
     }
 
     setResults({
-      recommendations,
+      recommendations: recommendations.slice(0, 3), // Top 3 recommendations
+      compatibleRecipes: compatibleRecipes.slice(0, 5), // Top 5 recipes
       userProfile: formData,
     });
     setCurrentStep(4);
+  };
+
+  const getColorForPlan = (planName) => {
+    const colors = [
+      "from-purple-500 to-pink-500",
+      "from-blue-500 to-green-500",
+      "from-green-500 to-blue-500",
+      "from-orange-500 to-red-500",
+      "from-green-400 to-emerald-500",
+      "from-indigo-500 to-purple-500",
+    ];
+    return colors[planName.length % colors.length];
   };
 
   const renderStep = () => {
@@ -377,48 +490,152 @@ export function DietCompatibilityChecker() {
             </h3>
 
             {results && (
-              <div className="space-y-4">
-                {results.recommendations.map((diet, index) => (
-                  <Card key={index} className="border-l-4 border-l-green-500">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                            {diet.name}
-                          </h4>
-                          <p className="text-gray-600 mb-3">
-                            {diet.description}
-                          </p>
+              <div className="space-y-6">
+                {/* Diet Plan Recommendations */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    Recommended Diet Plans
+                  </h4>
+                  <div className="space-y-4">
+                    {results.recommendations.map((diet, index) => (
+                      <Card
+                        key={index}
+                        className="border-l-4 border-l-green-500"
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="text-lg font-semibold text-gray-900">
+                                  {diet.name}
+                                </h4>
+                              </div>
+                              <p className="text-gray-600 mb-3">
+                                {diet.description}
+                              </p>
 
-                          <div className="flex items-center space-x-2 mb-3">
-                            <span className="text-sm text-gray-500">
-                              Compatibility:
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="bg-green-100 text-green-800"
-                            >
-                              {diet.compatibility}%
-                            </Badge>
-                          </div>
+                              <div className="flex items-center space-x-4 mb-3">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm text-gray-500">
+                                    Compatibility:
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-green-100 text-green-800"
+                                  >
+                                    {diet.compatibility}%
+                                  </Badge>
+                                </div>
+                                {diet.duration && (
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-500">
+                                      Duration:
+                                    </span>
+                                    <span className="text-sm text-gray-700">
+                                      {diet.duration}
+                                    </span>
+                                  </div>
+                                )}
+                                {diet.difficulty && (
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-500">
+                                      Difficulty:
+                                    </span>
+                                    <span className="text-sm text-gray-700">
+                                      {diet.difficulty}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-700">
-                              Key Benefits:
-                            </p>
-                            <ul className="list-disc list-inside space-y-1">
-                              {diet.benefits.map((benefit, idx) => (
-                                <li key={idx} className="text-sm text-gray-600">
-                                  {benefit}
-                                </li>
-                              ))}
-                            </ul>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">
+                                  Key Benefits:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1">
+                                  {diet.benefits.map((benefit, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-sm text-gray-600"
+                                    >
+                                      {benefit}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              {diet.realData && diet.id && (
+                                <div className="mt-4">
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      navigate(`/diet-plans/${diet.id}`)
+                                    }
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    View This Plan
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Compatible Recipes */}
+                {results.compatibleRecipes &&
+                  results.compatibleRecipes.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                        Compatible Recipes ({results.compatibleRecipes.length}{" "}
+                        found)
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {results.compatibleRecipes.map((recipe, index) => (
+                          <Card
+                            key={index}
+                            className="border border-green-200 hover:border-green-300 transition-colors"
+                          >
+                            <CardContent className="p-4">
+                              <h5 className="font-medium text-gray-900 mb-2">
+                                {recipe.name}
+                              </h5>
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                {recipe.description ||
+                                  "Delicious and healthy recipe"}
+                              </p>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  {recipe.prepTime && (
+                                    <span className="text-xs text-gray-500">
+                                      {recipe.prepTime}
+                                    </span>
+                                  )}
+                                  {recipe.difficulty && (
+                                    <Badge variant="outline" size="sm">
+                                      {recipe.difficulty}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    navigate(`/recipes/${recipe._id}`)
+                                  }
+                                >
+                                  View Recipe
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                  )}
 
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                   <div className="flex items-start space-x-3">
@@ -426,28 +643,42 @@ export function DietCompatibilityChecker() {
                     <div>
                       <h4 className="font-medium text-blue-900">Next Steps</h4>
                       <p className="text-sm text-blue-700 mt-1">
-                        Based on your preferences, we recommend starting with
-                        the highest compatibility diet plan. You can view
-                        detailed meal plans and get started on your health
-                        journey!
+                        Based on your preferences, we've found{" "}
+                        {results.recommendations.length} compatible diet plan(s)
+                        and {results.compatibleRecipes?.length || 0} matching
+                        recipes from our database. Start with the highest
+                        compatibility plan for best results!
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => navigate("/diet-plans")}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    View Diet Plans
+                    View All Diet Plans
                   </Button>
                   <Button
                     onClick={() => navigate("/recipes")}
                     variant="outline"
                   >
-                    Browse Recipes
+                    Browse All Recipes
                   </Button>
+                  {results.recommendations.length > 0 &&
+                    results.recommendations[0].realData && (
+                      <Button
+                        onClick={() =>
+                          navigate(
+                            `/diet-plans/${results.recommendations[0].id}`
+                          )
+                        }
+                        variant="secondary"
+                      >
+                        Start Best Match Plan
+                      </Button>
+                    )}
                 </div>
               </div>
             )}

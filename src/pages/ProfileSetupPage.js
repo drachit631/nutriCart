@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
@@ -18,20 +24,20 @@ export default function ProfileSetupPage() {
     height: "",
     weight: "",
     gender: "",
-    
+
     // Health Goals
     healthGoals: [],
     activityLevel: "",
-    
+
     // Diet Preferences
     dietType: "",
     allergies: [],
     restrictions: [],
-    
+
     // Budget & Location
     budget: "",
     location: "",
-    
+
     // Lifestyle
     cookingTime: "",
     mealPrepPreference: "",
@@ -54,41 +60,72 @@ export default function ProfileSetupPage() {
   ];
 
   const dietTypeOptions = [
-    { id: "balanced", label: "Balanced Diet", description: "A mix of all food groups" },
+    {
+      id: "balanced",
+      label: "Balanced Diet",
+      description: "A mix of all food groups",
+    },
     { id: "keto", label: "Ketogenic", description: "High fat, low carb" },
-    { id: "mediterranean", label: "Mediterranean", description: "Heart-healthy, whole foods" },
+    {
+      id: "mediterranean",
+      label: "Mediterranean",
+      description: "Heart-healthy, whole foods",
+    },
     { id: "vegan", label: "Vegan", description: "Plant-based only" },
-    { id: "vegetarian", label: "Vegetarian", description: "No meat, includes dairy" },
+    {
+      id: "vegetarian",
+      label: "Vegetarian",
+      description: "No meat, includes dairy",
+    },
     { id: "paleo", label: "Paleo", description: "Whole foods, no processed" },
-    { id: "low_carb", label: "Low Carb", description: "Reduced carbohydrate intake" },
+    {
+      id: "low_carb",
+      label: "Low Carb",
+      description: "Reduced carbohydrate intake",
+    },
   ];
 
   const allergyOptions = [
-    "Dairy", "Gluten", "Nuts", "Shellfish", "Eggs", "Soy", "Fish", "Sesame"
+    "Dairy",
+    "Gluten",
+    "Nuts",
+    "Shellfish",
+    "Eggs",
+    "Soy",
+    "Fish",
+    "Sesame",
   ];
 
   const activityLevels = [
-    { id: "sedentary", label: "Sedentary", description: "Little to no exercise" },
+    {
+      id: "sedentary",
+      label: "Sedentary",
+      description: "Little to no exercise",
+    },
     { id: "light", label: "Light", description: "1-3 days per week" },
     { id: "moderate", label: "Moderate", description: "3-5 days per week" },
     { id: "active", label: "Active", description: "6-7 days per week" },
-    { id: "very_active", label: "Very Active", description: "2x per day or intense" },
+    {
+      id: "very_active",
+      label: "Very Active",
+      description: "2x per day or intense",
+    },
   ];
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === "checkbox") {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: checked 
+        [name]: checked
           ? [...(prev[name] || []), value]
-          : (prev[name] || []).filter(item => item !== value)
+          : (prev[name] || []).filter((item) => item !== value),
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: value
+        [name]: value,
       }));
     }
   };
@@ -109,24 +146,33 @@ export default function ProfileSetupPage() {
     setLoading(true);
     try {
       const profileData = {
+        profileComplete: true,
         preferences: {
           ...formData,
           age: parseInt(formData.age) || null,
           height: parseInt(formData.height) || null,
           weight: parseInt(formData.weight) || null,
           budget: parseInt(formData.budget) || null,
-        }
+          dietaryRestrictions: formData.restrictions || [],
+          preferredDiets: formData.dietType ? [formData.dietType] : [],
+          allergies: formData.allergies || [],
+          healthGoals: formData.healthGoals || [],
+          monthlyBudget: parseInt(formData.budget) || null,
+          cookingExperience: formData.cookingTime || "",
+        },
       };
 
       await updateProfile(profileData);
-      
+
       toast({
         title: "Profile setup complete!",
-        description: "Welcome to NutriCart! Your personalized experience is ready.",
+        description:
+          "Welcome to NutriCart! Finding your compatible diets and recipes...",
         variant: "default",
       });
 
-      navigate("/dashboard");
+      // Show compatible content before navigating
+      await showCompatibleContent();
     } catch (error) {
       toast({
         title: "Setup failed",
@@ -136,6 +182,80 @@ export default function ProfileSetupPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const showCompatibleContent = async () => {
+    try {
+      // Get compatible diets and recipes based on user preferences
+      const compatibleDiets = getCompatibleDiets();
+      const compatibleRecipes = await getCompatibleRecipes();
+
+      // Show results modal or navigate with results
+      toast({
+        title: "Perfect matches found!",
+        description: `Found ${compatibleDiets.length} compatible diets and ${compatibleRecipes.length} recipes for you!`,
+        variant: "default",
+      });
+
+      // Navigate to dashboard after a delay to let user see the results
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
+    } catch (error) {
+      console.error("Error finding compatible content:", error);
+      navigate("/dashboard");
+    }
+  };
+
+  const getCompatibleDiets = () => {
+    const { dietType, healthGoals, allergies } = formData;
+
+    // Basic compatibility logic
+    const compatibleDiets = [];
+
+    if (dietType) {
+      compatibleDiets.push(dietType);
+    }
+
+    // Add related diets based on health goals
+    if (healthGoals.includes("weight_loss")) {
+      if (!compatibleDiets.includes("keto")) compatibleDiets.push("keto");
+      if (!compatibleDiets.includes("low_carb"))
+        compatibleDiets.push("low_carb");
+    }
+
+    if (healthGoals.includes("heart_health")) {
+      if (!compatibleDiets.includes("mediterranean"))
+        compatibleDiets.push("mediterranean");
+      if (!compatibleDiets.includes("dash")) compatibleDiets.push("dash");
+    }
+
+    if (healthGoals.includes("muscle_gain")) {
+      if (!compatibleDiets.includes("high_protein"))
+        compatibleDiets.push("high_protein");
+    }
+
+    // Filter out diets based on allergies
+    if (allergies.includes("Dairy")) {
+      return compatibleDiets.filter((diet) => !["vegetarian"].includes(diet));
+    }
+
+    if (allergies.includes("Gluten")) {
+      compatibleDiets.push("gluten_free");
+    }
+
+    return compatibleDiets;
+  };
+
+  const getCompatibleRecipes = async () => {
+    // This would normally call the API to get recipes
+    // For now, return mock data based on preferences
+    const compatibleDiets = getCompatibleDiets();
+    return compatibleDiets.map((diet) => ({
+      id: diet,
+      name: `${diet.charAt(0).toUpperCase() + diet.slice(1)} Recipe Collection`,
+      diet: diet,
+    }));
   };
 
   const renderStepContent = () => {
@@ -236,7 +356,9 @@ export default function ProfileSetupPage() {
                       className="sr-only"
                     />
                     <span className="text-xl">{goal.icon}</span>
-                    <span className="text-sm font-medium font-body">{goal.label}</span>
+                    <span className="text-sm font-medium font-body">
+                      {goal.label}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -265,8 +387,12 @@ export default function ProfileSetupPage() {
                       className="mt-1"
                     />
                     <div>
-                      <div className="font-medium font-heading">{level.label}</div>
-                      <div className="text-sm text-muted font-body">{level.description}</div>
+                      <div className="font-medium font-heading">
+                        {level.label}
+                      </div>
+                      <div className="text-sm text-muted font-body">
+                        {level.description}
+                      </div>
                     </div>
                   </label>
                 ))}
@@ -301,8 +427,12 @@ export default function ProfileSetupPage() {
                       className="mt-1"
                     />
                     <div>
-                      <div className="font-medium font-heading">{diet.label}</div>
-                      <div className="text-sm text-muted font-body">{diet.description}</div>
+                      <div className="font-medium font-heading">
+                        {diet.label}
+                      </div>
+                      <div className="text-sm text-muted font-body">
+                        {diet.description}
+                      </div>
                     </div>
                   </label>
                 ))}
@@ -355,7 +485,9 @@ export default function ProfileSetupPage() {
                 min="1000"
                 max="50000"
               />
-              <p className="text-xs text-muted mt-1">This helps us optimize your meal plans</p>
+              <p className="text-xs text-muted mt-1">
+                This helps us optimize your meal plans
+              </p>
             </div>
 
             <div>
@@ -369,7 +501,9 @@ export default function ProfileSetupPage() {
                 onChange={handleInputChange}
                 placeholder="Mumbai"
               />
-              <p className="text-xs text-muted mt-1">For local farmer partnerships and delivery</p>
+              <p className="text-xs text-muted mt-1">
+                For local farmer partnerships and delivery
+              </p>
             </div>
 
             <div>
@@ -434,11 +568,11 @@ export default function ProfileSetupPage() {
                 NutriCart
               </span>
             </div>
-            
+
             <Badge variant="premium" className="mb-4">
               🎯 Profile Setup
             </Badge>
-            
+
             <h1 className="text-3xl font-bold text-foreground mb-2 font-heading">
               Welcome, {user?.firstName}!
             </h1>
@@ -453,19 +587,25 @@ export default function ProfileSetupPage() {
               {steps.map((step, index) => (
                 <div
                   key={step.id}
-                  className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}
+                  className={`flex items-center ${
+                    index < steps.length - 1 ? "flex-1" : ""
+                  }`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    currentStep >= step.id
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      currentStep >= step.id
+                        ? "bg-primary text-white"
+                        : "bg-gray-200 text-gray-600"
+                    }`}
+                  >
                     {step.id}
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`flex-1 h-1 mx-2 ${
-                      currentStep > step.id ? 'bg-primary' : 'bg-gray-200'
-                    }`} />
+                    <div
+                      className={`flex-1 h-1 mx-2 ${
+                        currentStep > step.id ? "bg-primary" : "bg-gray-200"
+                      }`}
+                    />
                   )}
                 </div>
               ))}
@@ -482,9 +622,7 @@ export default function ProfileSetupPage() {
 
           {/* Form Content */}
           <Card className="border-0 shadow-2xl">
-            <CardContent className="p-8">
-              {renderStepContent()}
-            </CardContent>
+            <CardContent className="p-8">{renderStepContent()}</CardContent>
           </Card>
 
           {/* Navigation Buttons */}
@@ -498,17 +636,12 @@ export default function ProfileSetupPage() {
             </Button>
 
             <div className="flex space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate("/dashboard")}
-              >
+              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
                 Skip Setup
               </Button>
-              
+
               {currentStep < steps.length ? (
-                <Button onClick={handleNext}>
-                  Next
-                </Button>
+                <Button onClick={handleNext}>Next</Button>
               ) : (
                 <Button onClick={handleSubmit} disabled={loading}>
                   {loading ? "Completing Setup..." : "Complete Setup"}

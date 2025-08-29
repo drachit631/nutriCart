@@ -131,6 +131,12 @@ export default function RecipePage() {
   };
 
   const handleUpdateIngredientQuantity = async (ingredient, newQuantity) => {
+    console.log(
+      "RecipePage: handleUpdateIngredientQuantity called with:",
+      ingredient.name,
+      newQuantity
+    );
+
     // Find matching product to get product ID
     const matchingProduct = products.find(
       (product) =>
@@ -141,6 +147,7 @@ export default function RecipePage() {
     );
 
     if (!matchingProduct) {
+      console.error("Product not found for ingredient:", ingredient.name);
       toast({
         title: "Error",
         description: "Product not found.",
@@ -149,12 +156,20 @@ export default function RecipePage() {
       return;
     }
 
+    console.log(
+      "Found matching product:",
+      matchingProduct.name,
+      matchingProduct._id
+    );
+
     if (newQuantity <= 0) {
+      console.log("Removing ingredient from cart");
       await handleRemoveIngredientFromCart(ingredient);
       return;
     }
 
     try {
+      console.log("Updating ingredient quantity to:", newQuantity);
       await updateQuantity(matchingProduct._id, newQuantity);
 
       toast({
@@ -174,58 +189,67 @@ export default function RecipePage() {
 
   const handleOrderMissingIngredients = async () => {
     try {
-      const missingIngredients = recipe.ingredients.filter((ingredient) => {
-        const matchingProduct = products.find(
-          (product) =>
-            product.name.toLowerCase().trim() ===
-              ingredient.productName?.toLowerCase().trim() ||
-            product.name.toLowerCase().trim() ===
-              ingredient.name.toLowerCase().trim()
-        );
+      // Get ALL ingredients that have matching products
+      const availableIngredients = recipe.ingredients
+        .map((ingredient) => {
+          const matchingProduct = products.find(
+            (product) =>
+              product.name.toLowerCase().trim() ===
+                ingredient.productName?.toLowerCase().trim() ||
+              product.name.toLowerCase().trim() ===
+                ingredient.name.toLowerCase().trim()
+          );
+          return matchingProduct
+            ? { ingredient, product: matchingProduct }
+            : null;
+        })
+        .filter(Boolean);
 
-        if (!matchingProduct) return false; // Not available
+      if (availableIngredients.length === 0) {
+        toast({
+          title: "No Ingredients Available",
+          description:
+            "No ingredients for this recipe are available in our store.",
+          variant: "destructive",
+        });
+        return;
+      }
 
+      // Filter to get ONLY MISSING ingredients (not in cart)
+      const missingIngredients = availableIngredients.filter(({ product }) => {
         const cartItem = cart.items.find(
-          (item) => item.productId === matchingProduct._id
+          (item) => item.productId === product._id
         );
-
         return !cartItem; // Not in cart
       });
 
       if (missingIngredients.length === 0) {
         toast({
-          title: "All Ingredients Available",
-          description:
-            "All ingredients for this recipe are already in your cart!",
+          title: "All Ingredients Already in Cart",
+          description: "You already have all the ingredients for this recipe!",
           variant: "default",
         });
         return;
       }
 
-      // Add all missing ingredients to cart
-      for (const ingredient of missingIngredients) {
-        const matchingProduct = products.find(
-          (product) =>
-            product.name.toLowerCase().trim() ===
-              ingredient.productName?.toLowerCase().trim() ||
-            product.name.toLowerCase().trim() ===
-              ingredient.name.toLowerCase().trim()
-        );
+      console.log("Adding missing ingredients to cart:", missingIngredients);
 
-        if (matchingProduct) {
-          await addToCart(matchingProduct._id, 1);
-        }
-      }
+      // Add ONLY missing ingredients to cart simultaneously
+      const addPromises = missingIngredients.map(({ product }) =>
+        addToCart(product._id, 1, product.price)
+      );
+
+      await Promise.all(addPromises);
 
       toast({
-        title: "Ingredients Added",
-        description: `${missingIngredients.length} ingredients have been added to your cart!`,
+        title: "Missing Ingredients Added",
+        description: `${missingIngredients.length} missing ingredients added to cart!`,
         variant: "default",
       });
 
       // Stay on current page - no navigation needed
     } catch (error) {
-      console.error("Error adding ingredients to cart:", error);
+      console.error("Error adding missing ingredients to cart:", error);
       toast({
         title: "Error",
         description:
@@ -521,12 +545,18 @@ export default function RecipePage() {
                                 </span>
                                 <div className="flex items-center space-x-1 bg-green-100 rounded-lg px-2 py-1">
                                   <button
-                                    onClick={() =>
+                                    onClick={() => {
+                                      console.log(
+                                        "RecipePage: Minus button clicked for ingredient:",
+                                        ingredient.name,
+                                        "current quantity:",
+                                        cartQuantity
+                                      );
                                       handleUpdateIngredientQuantity(
                                         ingredient,
                                         Math.max(0, cartQuantity - 1)
-                                      )
-                                    }
+                                      );
+                                    }}
                                     className="w-6 h-6 flex items-center justify-center text-green-600 hover:bg-green-200 rounded"
                                   >
                                     -
@@ -535,12 +565,18 @@ export default function RecipePage() {
                                     {cartQuantity}
                                   </span>
                                   <button
-                                    onClick={() =>
+                                    onClick={() => {
+                                      console.log(
+                                        "RecipePage: Plus button clicked for ingredient:",
+                                        ingredient.name,
+                                        "current quantity:",
+                                        cartQuantity
+                                      );
                                       handleUpdateIngredientQuantity(
                                         ingredient,
                                         cartQuantity + 1
-                                      )
-                                    }
+                                      );
+                                    }}
                                     className="w-6 h-6 flex items-center justify-center text-green-600 hover:bg-green-200 rounded"
                                   >
                                     +

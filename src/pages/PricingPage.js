@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -9,44 +10,40 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { toast } from "../components/ui/use-toast";
+import {
+  TIER_PRICING,
+  SUBSCRIPTION_TIERS,
+  getTierDisplayName,
+} from "../utils/subscriptionUtils";
 
 export default function PricingPage() {
   const { isAuthenticated } = useAuth();
+  const { subscription, upgradeSubscription, loading } = useSubscription();
   const navigate = useNavigate();
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [paymentStep, setPaymentStep] = useState(1); // 1: Plan Selection, 2: Payment Details, 3: Processing, 4: Success
 
   const pricingPlans = [
     {
-      name: "Free",
-      price: 0,
-      period: "forever",
+      tier: SUBSCRIPTION_TIERS.FREE,
+      name: getTierDisplayName(SUBSCRIPTION_TIERS.FREE),
+      price: TIER_PRICING[SUBSCRIPTION_TIERS.FREE].price,
+      period: TIER_PRICING[SUBSCRIPTION_TIERS.FREE].period,
       description: "Perfect for getting started with healthy eating",
-      features: [
-        "Access to basic diet plans",
-        "Product browsing",
-        "Basic recipe suggestions",
-        "Community support",
-        "Email notifications",
-      ],
+      features: TIER_PRICING[SUBSCRIPTION_TIERS.FREE].features,
       popular: false,
       color: "from-gray-500 to-gray-600",
       buttonText: "Get Started Free",
       buttonAction: () => navigate("/signup"),
     },
     {
-      name: "Premium",
-      price: 999,
-      period: "month",
+      tier: SUBSCRIPTION_TIERS.PREMIUM,
+      name: getTierDisplayName(SUBSCRIPTION_TIERS.PREMIUM),
+      price: TIER_PRICING[SUBSCRIPTION_TIERS.PREMIUM].price,
+      period: TIER_PRICING[SUBSCRIPTION_TIERS.PREMIUM].period,
       description: "Advanced features for serious health goals",
-      features: [
-        "All Free features",
-        "Personalized meal plans",
-        "Smart pantry sync",
-        "Progress tracking",
-        "Priority customer support",
-        "Exclusive recipes",
-        "Nutritional analysis",
-        "Mobile app access",
-      ],
+      features: TIER_PRICING[SUBSCRIPTION_TIERS.PREMIUM].features,
       popular: true,
       color: "from-green-500 to-blue-600",
       buttonText: "Start Premium",
@@ -60,29 +57,18 @@ export default function PricingPage() {
           navigate("/signup");
           return;
         }
-        // TODO: Implement subscription logic
-        toast({
-          title: "Coming Soon",
-          description: "Premium subscription will be available soon!",
-          variant: "default",
-        });
+        setSelectedPlan(SUBSCRIPTION_TIERS.PREMIUM);
+        setPaymentStep(1);
+        setShowPaymentModal(true);
       },
     },
     {
-      name: "Pro",
-      price: 1999,
-      period: "month",
+      tier: SUBSCRIPTION_TIERS.PRO,
+      name: getTierDisplayName(SUBSCRIPTION_TIERS.PRO),
+      price: TIER_PRICING[SUBSCRIPTION_TIERS.PRO].price,
+      period: TIER_PRICING[SUBSCRIPTION_TIERS.PRO].period,
       description: "Complete nutrition ecosystem for professionals",
-      features: [
-        "All Premium features",
-        "1-on-1 nutrition consultation",
-        "Custom meal planning",
-        "Advanced analytics",
-        "Family plan management",
-        "Restaurant recommendations",
-        "24/7 priority support",
-        "Exclusive workshops",
-      ],
+      features: TIER_PRICING[SUBSCRIPTION_TIERS.PRO].features,
       popular: false,
       color: "from-purple-500 to-pink-600",
       buttonText: "Start Pro",
@@ -96,15 +82,46 @@ export default function PricingPage() {
           navigate("/signup");
           return;
         }
-        // TODO: Implement subscription logic
-        toast({
-          title: "Coming Soon",
-          description: "Pro subscription will be available soon!",
-          variant: "default",
-        });
+        setSelectedPlan(SUBSCRIPTION_TIERS.PRO);
+        setPaymentStep(1);
+        setShowPaymentModal(true);
       },
     },
   ];
+
+  const handlePayment = async (paymentData) => {
+    try {
+      setPaymentStep(3); // Processing
+
+      const result = await upgradeSubscription(selectedPlan, paymentData);
+
+      if (result.success) {
+        setPaymentStep(4); // Success
+        toast({
+          title: "Subscription Activated!",
+          description: `Welcome to ${getTierDisplayName(
+            selectedPlan
+          )}! Your subscription is now active.`,
+          variant: "default",
+        });
+
+        setTimeout(() => {
+          setShowPaymentModal(false);
+          navigate("/dashboard");
+        }, 3000);
+      } else {
+        throw new Error(result.error || "Payment failed");
+      }
+    } catch (error) {
+      console.error("Payment failed:", error);
+      toast({
+        title: "Payment Failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+      setPaymentStep(2); // Go back to payment form
+    }
+  };
 
   const handleBackToHome = () => {
     navigate("/");
@@ -350,6 +367,222 @@ export default function PricingPage() {
           </Button>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {paymentStep === 1 && (
+                <div>
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800">
+                      Upgrade to {getTierDisplayName(selectedPlan)}
+                    </h3>
+                    <p className="text-gray-600 mt-2">
+                      ₹{TIER_PRICING[selectedPlan]?.price}/
+                      {TIER_PRICING[selectedPlan]?.period}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium text-gray-800">
+                      You'll get access to:
+                    </h4>
+                    <ul className="space-y-2">
+                      {TIER_PRICING[selectedPlan]?.features.map(
+                        (feature, index) => (
+                          <li key={index} className="flex items-start">
+                            <svg
+                              className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span className="text-gray-700 text-sm">
+                              {feature}
+                            </span>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPaymentModal(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => setPaymentStep(2)}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                    >
+                      Continue to Payment
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {paymentStep === 2 && (
+                <div>
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800">
+                      Payment Details
+                    </h3>
+                    <p className="text-gray-600 mt-2">
+                      {getTierDisplayName(selectedPlan)} Plan - ₹
+                      {TIER_PRICING[selectedPlan]?.price}/
+                      {TIER_PRICING[selectedPlan]?.period}
+                    </p>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target);
+                      const paymentData = {
+                        cardNumber: formData.get("cardNumber"),
+                        expiryDate: formData.get("expiryDate"),
+                        cvv: formData.get("cvv"),
+                        cardholderName: formData.get("cardholderName"),
+                      };
+                      handlePayment(paymentData);
+                    }}
+                  >
+                    <div className="space-y-4 mb-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Cardholder Name
+                        </label>
+                        <input
+                          type="text"
+                          name="cardholderName"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          placeholder="John Doe"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Card Number
+                        </label>
+                        <input
+                          type="text"
+                          name="cardNumber"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          placeholder="1234 5678 9012 3456"
+                          maxLength="19"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Expiry Date
+                          </label>
+                          <input
+                            type="text"
+                            name="expiryDate"
+                            required
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="MM/YY"
+                            maxLength="5"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            CVV
+                          </label>
+                          <input
+                            type="text"
+                            name="cvv"
+                            required
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="123"
+                            maxLength="4"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPaymentStep(1)}
+                        className="flex-1"
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                      >
+                        {loading ? "Processing..." : "Pay Now"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {paymentStep === 3 && (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    Processing Payment
+                  </h3>
+                  <p className="text-gray-600">
+                    Please wait while we process your payment...
+                  </p>
+                </div>
+              )}
+
+              {paymentStep === 4 && (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg
+                      className="w-8 h-8 text-green-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    Payment Successful!
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Welcome to {getTierDisplayName(selectedPlan)}! Redirecting
+                    to dashboard...
+                  </p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-600 h-2 rounded-full animate-pulse"
+                      style={{ width: "100%" }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

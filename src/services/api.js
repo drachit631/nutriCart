@@ -4,11 +4,18 @@ const BASE_URL =
 
 async function request(path, options = {}) {
   try {
+    const token = localStorage.getItem("nutriCart_token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+      headers,
       ...options,
     });
 
@@ -59,8 +66,8 @@ export const authAPI = {
     if (!userId) {
       throw new Error("User ID is required");
     }
-    return request(`/users/${userId}`, {
-      method: "PATCH",
+    return request(`/auth/profile`, {
+      method: "PUT",
       body: JSON.stringify(profileData),
     });
   },
@@ -96,13 +103,11 @@ export const dietPlansAPI = {
   },
 
   // Start a diet plan for user
-  startPlan: async (userId, dietPlanId) => {
-    // placeholder success
-    return {
-      success: true,
-      message: `Started ${dietPlanId}`,
-      startDate: new Date().toISOString(),
-    };
+  startPlan: async (userId, dietPlanId, formData) => {
+    return request(`/diet-plans/${dietPlanId}/start`, {
+      method: "POST",
+      body: JSON.stringify({ userId, formData }),
+    });
   },
 };
 

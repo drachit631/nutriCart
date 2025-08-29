@@ -47,17 +47,14 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Budget-Friendly Diet Plans */}
-      <BudgetDietPlans />
+      {/* Diet Compatibility Checker */}
+      <DietCompatibilityChecker />
 
       {/* Diet Plans Carousel */}
       <DietPlansCarousel />
 
       {/* Recipe Integration */}
       <RecipeIntegration />
-
-      {/* Diet Compatibility Checker */}
-      <DietCompatibilityChecker />
 
       {/* Final CTA */}
       <section className="py-20 bg-gradient-to-r from-primary to-secondary">

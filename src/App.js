@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
+import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import { Toaster } from "./components/ui/toaster";
 
 // Pages
@@ -24,33 +25,38 @@ import PricingPage from "./pages/PricingPage";
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/products/:id" element={<ProductDetailPage />} />
-              <Route path="/diet-plans" element={<DietPlansPage />} />
-              <Route path="/diet-plans/:id" element={<DietPlanDetailsPage />} />
-              <Route
-                path="/diet-plans/:id/onboarding"
-                element={<DietPlanOnboardingPage />}
-              />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/profile-setup" element={<ProfileSetupPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/checkout" element={<CheckoutPage />} />
-              <Route path="/recipes" element={<RecipesPage />} />
-              <Route path="/recipes/:id" element={<RecipePage />} />
-              <Route path="/pricing" element={<PricingPage />} />
-            </Routes>
-            <Toaster />
-          </div>
-        </Router>
-      </CartProvider>
+      <SubscriptionProvider>
+        <CartProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/products/:id" element={<ProductDetailPage />} />
+                <Route path="/diet-plans" element={<DietPlansPage />} />
+                <Route
+                  path="/diet-plans/:id"
+                  element={<DietPlanDetailsPage />}
+                />
+                <Route
+                  path="/diet-plans/:id/onboarding"
+                  element={<DietPlanOnboardingPage />}
+                />
+                <Route path="/signup" element={<SignupPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/profile-setup" element={<ProfileSetupPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/cart" element={<CartPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/recipes" element={<RecipesPage />} />
+                <Route path="/recipes/:id" element={<RecipePage />} />
+                <Route path="/pricing" element={<PricingPage />} />
+              </Routes>
+              <Toaster />
+            </div>
+          </Router>
+        </CartProvider>
+      </SubscriptionProvider>
     </AuthProvider>
   );
 }

@@ -133,224 +133,173 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const addToCart = async (productId, quantity = 1) => {
-    console.log("CartContext: addToCart called with:", productId, quantity);
-    console.log("User authenticated:", isAuthenticated, "User ID:", user?.id);
+  const addToCart = async (productId, quantity = 1, productPrice = null) => {
+    console.log(
+      "CartContext: UNIFIED addToCart called with:",
+      productId,
+      quantity,
+      productPrice
+    );
 
-    if (isAuthenticated && user?.id) {
-      // User is authenticated, add to backend
-      try {
-        console.log("Adding to backend cart...");
-        setUpdatingItems((prev) => new Set(prev).add(productId));
+    // UNIFIED LOGIC: Apply local cart update immediately for ALL users
+    const existingItem = cart.items.find(
+      (item) => item.productId === productId
+    );
+    let newCart;
 
-        const cartData = await cartAPI.addItem(user.id, productId, quantity);
-        console.log("Backend cart response:", cartData);
-
-        setCart({
-          ...cartData,
-          count: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
-        });
-
-        toast({
-          title: "Added to Cart",
-          description: "Item has been added to your cart successfully!",
-          variant: "default",
-        });
-      } catch (error) {
-        console.error("Error adding to cart:", error);
-        toast({
-          title: "Error",
-          description:
-            error.message || "Failed to add item to cart. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setUpdatingItems((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-      }
+    if (existingItem) {
+      newCart = {
+        ...cart,
+        items: cart.items.map((item) =>
+          item.productId === productId
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        ),
+      };
     } else {
-      // User is not authenticated, add to local cart
-      console.log("Adding to local cart...");
-      const existingItem = cart.items.find(
-        (item) => item.productId === productId
-      );
-      let newCart;
+      const price = productPrice || 0;
+      newCart = {
+        ...cart,
+        items: [...cart.items, { productId, quantity, price }],
+      };
+    }
 
-      if (existingItem) {
-        newCart = {
-          ...cart,
-          items: cart.items.map((item) =>
-            item.productId === productId
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          ),
-        };
-      } else {
-        newCart = {
-          ...cart,
-          items: [...cart.items, { productId, quantity, price: 0 }], // Price will be loaded later
-        };
+    // Calculate totals
+    newCart.count = newCart.items.reduce((sum, item) => sum + item.quantity, 0);
+    newCart.total = newCart.items.reduce(
+      (sum, item) => sum + (item.price || 0) * item.quantity,
+      0
+    );
+
+    // Update cart state immediately for instant UI feedback
+    console.log("Updating cart state immediately:", newCart);
+    setCart(newCart);
+    saveLocalCart(newCart);
+
+    // Show success message
+    toast({
+      title: "Added to Cart",
+      description: "Item has been added to your cart!",
+      variant: "default",
+    });
+
+    // For logged-in users, sync to backend in background (non-blocking)
+    if (isAuthenticated && user?.id) {
+      try {
+        console.log("Background sync to backend...");
+        await cartAPI.addItem(user.id, productId, quantity);
+        console.log("Backend sync successful");
+      } catch (error) {
+        console.error("Backend sync failed (but local cart works):", error);
+        // Don't show error to user since local cart already worked
       }
-
-      newCart.count = newCart.items.reduce(
-        (sum, item) => sum + item.quantity,
-        0
-      );
-      newCart.total = newCart.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-
-      console.log("New local cart:", newCart);
-      setCart(newCart);
-      console.log("Cart state updated, new cart:", newCart);
-      saveLocalCart(newCart);
-
-      // Force a re-render by updating the cart state again
-      setTimeout(() => {
-        console.log("Forcing cart state update...");
-        setCart((prevCart) => {
-          console.log("Previous cart state:", prevCart);
-          // Create a completely new object to ensure React detects the change
-          const updatedCart = {
-            items: [...prevCart.items],
-            total: prevCart.total,
-            count: prevCart.count,
-          };
-          console.log("Updated cart state:", updatedCart);
-          return updatedCart;
-        });
-      }, 50);
-
-      toast({
-        title: "Added to Cart",
-        description: "Item has been added to your local cart!",
-        variant: "default",
-      });
     }
   };
 
   const updateQuantity = async (productId, quantity) => {
-    if (isAuthenticated && user?.id) {
-      // User is authenticated, update in backend
-      try {
-        setUpdatingItems((prev) => new Set(prev).add(productId));
+    console.log(
+      "CartContext: UNIFIED updateQuantity called with:",
+      productId,
+      quantity
+    );
 
-        const cartData = await cartAPI.updateQuantity(
-          user.id,
-          productId,
-          quantity
-        );
+    // UNIFIED LOGIC: Apply local cart update immediately for ALL users
+    const newCart = {
+      ...cart,
+      items: cart.items
+        .map((item) =>
+          item.productId === productId
+            ? { ...item, quantity: Math.max(0, quantity) }
+            : item
+        )
+        .filter((item) => item.quantity > 0),
+    };
 
-        setCart({
-          ...cartData,
-          count: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
-        });
+    // Calculate totals
+    newCart.count = newCart.items.reduce((sum, item) => sum + item.quantity, 0);
+    newCart.total = newCart.items.reduce(
+      (sum, item) => sum + (item.price || 0) * item.quantity,
+      0
+    );
 
-        if (quantity > 0) {
-          toast({
-            title: "Cart Updated",
-            description: "Cart quantity has been updated successfully!",
-            variant: "default",
-          });
-        }
-      } catch (error) {
-        console.error("Error updating cart:", error);
-        toast({
-          title: "Error",
-          description:
-            error.message || "Failed to update cart. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setUpdatingItems((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-      }
+    // Update cart state immediately for instant UI feedback
+    console.log("Updating cart state immediately:", newCart);
+    setCart(newCart);
+    saveLocalCart(newCart);
+
+    // Show appropriate message
+    if (quantity > 0) {
+      toast({
+        title: "Cart Updated",
+        description: "Cart quantity has been updated successfully!",
+        variant: "default",
+      });
     } else {
-      // User is not authenticated, update local cart
-      const newCart = {
-        ...cart,
-        items: cart.items
-          .map((item) =>
-            item.productId === productId
-              ? { ...item, quantity: Math.max(0, quantity) }
-              : item
-          )
-          .filter((item) => item.quantity > 0),
-      };
+      toast({
+        title: "Removed from Cart",
+        description: "Item has been removed from your cart.",
+        variant: "default",
+      });
+    }
 
-      newCart.count = newCart.items.reduce(
-        (sum, item) => sum + item.quantity,
-        0
-      );
-      newCart.total = newCart.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-
-      setCart(newCart);
-      saveLocalCart(newCart);
+    // For logged-in users, sync to backend in background (non-blocking)
+    if (isAuthenticated && user?.id) {
+      try {
+        console.log("Background sync to backend...");
+        if (quantity <= 0) {
+          await cartAPI.removeItem(user.id, productId);
+        } else {
+          await cartAPI.updateQuantity(user.id, productId, quantity);
+        }
+        console.log("Backend sync successful");
+      } catch (error) {
+        console.error("Backend sync failed (but local cart works):", error);
+        // Don't show error to user since local cart already worked
+      }
     }
   };
 
   const removeFromCart = async (productId) => {
+    console.log("CartContext: UNIFIED removeFromCart called with:", productId);
+
+    // UNIFIED LOGIC: Apply local cart update immediately for ALL users
+    const newCart = {
+      ...cart,
+      items: cart.items.filter((item) => item.productId !== productId),
+    };
+
+    // Calculate totals
+    newCart.count = newCart.items.reduce((sum, item) => sum + item.quantity, 0);
+    newCart.total = newCart.items.reduce(
+      (sum, item) => sum + (item.price || 0) * item.quantity,
+      0
+    );
+
+    // Update cart state immediately for instant UI feedback
+    console.log("Removing from cart immediately:", newCart);
+    setCart(newCart);
+    saveLocalCart(newCart);
+
+    // Show success message
+    toast({
+      title: "Removed from Cart",
+      description: "Item has been removed from your cart.",
+      variant: "default",
+    });
+
+    // For logged-in users, sync to backend in background (non-blocking)
     if (isAuthenticated && user?.id) {
-      // User is authenticated, remove from backend
       try {
-        setUpdatingItems((prev) => new Set(prev).add(productId));
-
-        const cartData = await cartAPI.removeItem(user.id, productId);
-
-        setCart({
-          ...cartData,
-          count: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
-        });
-
-        toast({
-          title: "Removed from Cart",
-          description: "Item has been removed from your cart.",
-          variant: "default",
-        });
+        console.log("Background sync removal to backend...");
+        await cartAPI.removeItem(user.id, productId);
+        console.log("Backend removal sync successful");
       } catch (error) {
-        console.error("Error removing from cart:", error);
-        toast({
-          title: "Error",
-          description:
-            error.message ||
-            "Failed to remove item from cart. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setUpdatingItems((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
+        console.error(
+          "Backend removal sync failed (but local cart works):",
+          error
+        );
+        // Don't show error to user since local cart already worked
       }
-    } else {
-      // User is not authenticated, remove from local cart
-      const newCart = {
-        ...cart,
-        items: cart.items.filter((item) => item.productId !== productId),
-      };
-
-      newCart.count = newCart.items.reduce(
-        (sum, item) => sum + item.quantity,
-        0
-      );
-      newCart.total = newCart.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-
-      setCart(newCart);
-      saveLocalCart(newCart);
     }
   };
 
@@ -403,6 +352,36 @@ export const CartProvider = ({ children }) => {
     return updatingItems.has(productId);
   };
 
+  // Update product prices in local cart when products are loaded
+  const updateLocalCartPrices = (products) => {
+    if (
+      !isAuthenticated &&
+      cart.items.length > 0 &&
+      products &&
+      products.length > 0
+    ) {
+      const updatedItems = cart.items.map((item) => {
+        const product = products.find((p) => p._id === item.productId);
+        return {
+          ...item,
+          price: product ? product.price : item.price,
+        };
+      });
+
+      const newCart = {
+        ...cart,
+        items: updatedItems,
+        total: updatedItems.reduce(
+          (sum, item) => sum + (item.price || 0) * item.quantity,
+          0
+        ),
+      };
+
+      setCart(newCart);
+      saveLocalCart(newCart);
+    }
+  };
+
   const value = {
     cart,
     loading,
@@ -414,6 +393,7 @@ export const CartProvider = ({ children }) => {
     isInCart,
     loadCart,
     isItemUpdating,
+    updateLocalCartPrices,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

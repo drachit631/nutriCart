@@ -57,14 +57,20 @@ export default function CartPage() {
     }
   };
 
-  const handleQuantityChange = (productId, change) => {
-    const currentQuantity =
-      cart.items.find((item) => item.productId === productId)?.quantity || 0;
-    const newQuantity = Math.max(0, currentQuantity + change);
+  const handleQuantityChange = (productId, newQuantity) => {
+    console.log(
+      "CartPage: handleQuantityChange called with:",
+      productId,
+      newQuantity
+    );
 
-    if (newQuantity === 0) {
+    console.log("New quantity:", newQuantity);
+
+    if (newQuantity <= 0) {
+      console.log("Removing item from cart");
       removeFromCart(productId);
     } else {
+      console.log("Updating quantity");
       updateQuantity(productId, newQuantity);
     }
   };
@@ -241,10 +247,21 @@ export default function CartPage() {
                         {/* Quantity Controls */}
                         <div className="flex items-center space-x-3">
                           <button
-                            onClick={() =>
-                              handleQuantityChange(item.productId, -1)
-                            }
-                            className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                            onClick={() => {
+                              console.log(
+                                "CartPage: Minus button clicked for product:",
+                                item.productId,
+                                "current quantity:",
+                                item.quantity,
+                                "new quantity will be:",
+                                item.quantity - 1
+                              );
+                              handleQuantityChange(
+                                item.productId,
+                                item.quantity - 1
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors disabled:opacity-50"
                           >
                             <svg
                               className="w-4 h-4"
@@ -264,10 +281,21 @@ export default function CartPage() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() =>
-                              handleQuantityChange(item.productId, 1)
-                            }
-                            className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                            onClick={() => {
+                              console.log(
+                                "CartPage: Plus button clicked for product:",
+                                item.productId,
+                                "current quantity:",
+                                item.quantity,
+                                "new quantity will be:",
+                                item.quantity + 1
+                              );
+                              handleQuantityChange(
+                                item.productId,
+                                item.quantity + 1
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors disabled:opacity-50"
                           >
                             <svg
                               className="w-4 h-4"

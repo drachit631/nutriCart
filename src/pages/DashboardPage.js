@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { dashboardAPI, ordersAPI } from "../services/api";
 import { Button } from "../components/ui/button";
 import {
@@ -10,17 +11,27 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
+import { getTierDisplayName } from "../utils/subscriptionUtils";
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { cart } = useCart();
+  const { subscription } = useSubscription();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth loading to complete before making decisions
+    if (authLoading) {
+      return; // Still loading authentication state
+    }
+
+    // Only redirect if definitely not authenticated
     if (!isAuthenticated) {
+      console.log("Dashboard: User not authenticated - redirecting to login");
       toast({
         title: "Please Sign In",
         description: "You need to sign in to view your dashboard.",
@@ -30,11 +41,11 @@ export default function DashboardPage() {
       return;
     }
 
-    // Only load dashboard data if user object and user.id are available
+    // Load dashboard data if authenticated and user data is available
     if (user && user.id) {
       loadDashboardData();
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, authLoading]);
 
   const loadDashboardData = async () => {
     try {
@@ -58,6 +69,19 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null; // Will redirect to login
@@ -151,9 +175,39 @@ export default function DashboardPage() {
                     <label className="text-sm font-medium text-gray-500">
                       Subscription
                     </label>
-                    <p className="text-lg font-semibold capitalize">
-                      {user?.subscription || "Free"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-lg font-semibold capitalize">
+                        {getTierDisplayName(subscription?.tier) || "Free"}
+                      </p>
+                      <Badge
+                        variant={
+                          subscription?.tier === "free"
+                            ? "secondary"
+                            : subscription?.tier === "premium"
+                            ? "default"
+                            : "destructive"
+                        }
+                        className={
+                          subscription?.tier === "free"
+                            ? "bg-gray-100 text-gray-800"
+                            : subscription?.tier === "premium"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-purple-100 text-purple-800"
+                        }
+                      >
+                        {subscription?.tier === "pro"
+                          ? "👑 Pro"
+                          : subscription?.tier === "premium"
+                          ? "⭐ Premium"
+                          : "🆓 Free"}
+                      </Badge>
+                    </div>
+                    {subscription?.tier !== "free" && subscription?.endDate && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {subscription?.isActive ? "Active until" : "Expired on"}{" "}
+                        {new Date(subscription.endDate).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">
@@ -165,14 +219,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {!user?.profileComplete && (
-                  <Button
-                    onClick={() => navigate("/profile-setup")}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Complete Profile Setup
-                  </Button>
-                )}
+                <div className="flex gap-3">
+                  {!user?.profileComplete && (
+                    <Button
+                      onClick={() => navigate("/profile-setup")}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Complete Profile Setup
+                    </Button>
+                  )}
+                  {subscription?.tier === "free" && (
+                    <Button
+                      onClick={() => navigate("/pricing")}
+                      variant="outline"
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      🚀 Upgrade Plan
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -356,6 +421,13 @@ export default function DashboardPage() {
                   View Diet Plans
                 </Button>
                 <Button
+                  onClick={() => navigate("/orders")}
+                  variant="outline"
+                  className="w-full"
+                >
+                  📦 My Orders
+                </Button>
+                <Button
                   onClick={() => navigate("/profile-setup")}
                   variant="outline"
                   className="w-full"
@@ -390,6 +462,41 @@ export default function DashboardPage() {
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     View Cart
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Active Diet Plan */}
+            {user?.preferences?.activeDietPlan && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <span>🥗</span>
+                    <span>Active Diet Plan</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-green-600 mb-2">
+                      {user.preferences.activeDietPlan}
+                    </div>
+                    <p className="text-sm text-gray-600">Currently Following</p>
+                    {user.preferences.dietPlanStartDate && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Started:{" "}
+                        {new Date(
+                          user.preferences.dietPlanStartDate
+                        ).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => navigate("/diet-plans")}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    View All Plans
                   </Button>
                 </CardContent>
               </Card>

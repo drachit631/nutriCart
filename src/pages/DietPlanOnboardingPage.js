@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
@@ -10,6 +10,7 @@ import {
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
+import { dietPlansAPI } from "../services/api";
 
 export default function DietPlanOnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -26,8 +27,40 @@ export default function DietPlanOnboardingPage() {
   });
 
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
+
+  // Pre-populate form data from user profile
+  useEffect(() => {
+    if (user && user.preferences) {
+      const preferences = user.preferences;
+      setFormData({
+        goal: mapHealthGoalsToGoal(preferences.healthGoals || []),
+        currentWeight: preferences.weight || "",
+        targetWeight: "", // This needs to be set by user
+        height: preferences.height || "",
+        activityLevel: preferences.activityLevel || "",
+        dietaryRestrictions: preferences.preferredDiets || [],
+        allergies: preferences.allergies || [],
+        budget: preferences.monthlyBudget || "",
+        cookingExperience: preferences.cookingExperience || "",
+      });
+    }
+  }, [user]);
+
+  // Helper function to map health goals to plan goal
+  const mapHealthGoalsToGoal = (healthGoals) => {
+    if (healthGoals.includes("weight_loss")) return "Weight Loss";
+    if (healthGoals.includes("muscle_gain")) return "Muscle Building";
+    if (healthGoals.includes("maintenance")) return "Maintenance";
+    if (healthGoals.includes("energy_boost")) return "Energy Boost";
+    if (
+      healthGoals.includes("heart_health") ||
+      healthGoals.includes("digestive_health")
+    )
+      return "Better Health";
+    return "";
+  };
 
   const steps = [
     {
@@ -73,8 +106,29 @@ export default function DietPlanOnboardingPage() {
 
   const handleComplete = async () => {
     try {
-      // TODO: Save user preferences and start the diet plan
-      // await dietPlansAPI.startPlan(user.id, id, formData);
+      // Start the diet plan
+      await dietPlansAPI.startPlan(user.id, id, formData);
+
+      // Update user profile with the new data
+      const updatedPreferences = {
+        preferences: {
+          ...user.preferences,
+          weight:
+            parseFloat(formData.currentWeight) || user.preferences?.weight,
+          height: parseFloat(formData.height) || user.preferences?.height,
+          activityLevel:
+            formData.activityLevel || user.preferences?.activityLevel,
+          monthlyBudget:
+            parseFloat(formData.budget) || user.preferences?.monthlyBudget,
+          cookingExperience:
+            formData.cookingExperience || user.preferences?.cookingExperience,
+          targetWeight: parseFloat(formData.targetWeight) || null,
+          currentGoal: formData.goal,
+          healthGoals: mapGoalToHealthGoals(formData.goal),
+        },
+      };
+
+      await updateProfile(updatedPreferences);
 
       toast({
         title: "Diet Plan Started!",
@@ -91,6 +145,24 @@ export default function DietPlanOnboardingPage() {
         description: "Failed to start diet plan. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Helper function to map goal back to health goals
+  const mapGoalToHealthGoals = (goal) => {
+    switch (goal) {
+      case "Weight Loss":
+        return ["weight_loss"];
+      case "Muscle Building":
+        return ["muscle_gain"];
+      case "Maintenance":
+        return ["maintenance"];
+      case "Energy Boost":
+        return ["energy_boost"];
+      case "Better Health":
+        return ["heart_health", "digestive_health"];
+      default:
+        return [];
     }
   };
 
