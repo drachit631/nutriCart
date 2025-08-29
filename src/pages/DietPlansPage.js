@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { dietPlansAPI } from "../services/api";
 import { Button } from "../components/ui/button";
 import {
@@ -9,7 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
+import {
+  canAccessContent,
+  getTierDisplayName,
+} from "../utils/subscriptionUtils";
 
 export default function DietPlansPage() {
   const [dietPlans, setDietPlans] = useState([]);
@@ -19,6 +25,7 @@ export default function DietPlansPage() {
   const [selectedDuration, setSelectedDuration] = useState("");
 
   const { isAuthenticated, user } = useAuth();
+  const { subscription } = useSubscription();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -232,31 +239,70 @@ export default function DietPlansPage() {
                   </div>
                 </div>
 
-                {/* Duration and Price */}
+                {/* Duration and Subscription Tier */}
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-sm text-gray-600">
                     Duration: {plan.duration}
                   </span>
-                  <span className="text-lg font-bold text-green-600">
-                    {plan.price === 0 ? "Free" : `₹${plan.price}`}
-                  </span>
+                  <Badge
+                    variant={
+                      plan.subscriptionTier === "free"
+                        ? "secondary"
+                        : plan.subscriptionTier === "premium"
+                        ? "default"
+                        : "destructive"
+                    }
+                    className={
+                      plan.subscriptionTier === "free"
+                        ? "bg-green-100 text-green-800"
+                        : plan.subscriptionTier === "premium"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-purple-100 text-purple-800"
+                    }
+                  >
+                    {getTierDisplayName(plan.subscriptionTier)}
+                  </Badge>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="space-y-2">
-                  <Button
-                    onClick={() => handleStartPlan(plan)}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    Start This Plan
-                  </Button>
-                  <Button
-                    onClick={() => handleLearnMore(plan)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Learn More
-                  </Button>
+                  {canAccessContent(subscription, plan.subscriptionTier) ? (
+                    <>
+                      <Button
+                        onClick={() => handleStartPlan(plan)}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        Start This Plan
+                      </Button>
+                      <Button
+                        onClick={() => handleLearnMore(plan)}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        Learn More
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        disabled
+                        className="w-full bg-gray-300 cursor-not-allowed relative"
+                      >
+                        <span className="mr-2">🔒</span>
+                        {plan.subscriptionTier === "premium"
+                          ? "Premium"
+                          : "Pro"}{" "}
+                        Required
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate("/pricing")}
+                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+                      >
+                        Upgrade to Access
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

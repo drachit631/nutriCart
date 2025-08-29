@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useSubscription } from "../contexts/SubscriptionContext";
-import { dashboardAPI, ordersAPI } from "../services/api";
+import { dashboardAPI, ordersAPI, dietPlansAPI } from "../services/api";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeDietPlan, setActiveDietPlan] = useState(null);
 
   useEffect(() => {
     // Wait for auth loading to complete before making decisions
@@ -47,6 +48,26 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, user, navigate, authLoading]);
 
+  // Load active diet plan when user's activeDietPlan changes
+  useEffect(() => {
+    if (
+      user?.preferences?.activeDietPlan &&
+      user.preferences.activeDietPlan !== activeDietPlan?._id
+    ) {
+      loadActiveDietPlan(user.preferences.activeDietPlan);
+    }
+  }, [user?.preferences?.activeDietPlan]);
+
+  const loadActiveDietPlan = async (dietPlanId) => {
+    try {
+      const dietPlan = await dietPlansAPI.getById(dietPlanId);
+      setActiveDietPlan(dietPlan);
+    } catch (error) {
+      console.error("Error loading active diet plan:", error);
+      // Don't show toast for this error as it's not critical
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
       // Double-check that user.id exists before making API calls
@@ -58,6 +79,11 @@ export default function DashboardPage() {
       setLoading(true);
       const data = await dashboardAPI.getDashboardData(user.id);
       setDashboardData(data);
+
+      // Load active diet plan details if user has one
+      if (user.preferences?.activeDietPlan) {
+        await loadActiveDietPlan(user.preferences.activeDietPlan);
+      }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast({
@@ -479,8 +505,17 @@ export default function DashboardPage() {
                 <CardContent className="space-y-3">
                   <div className="text-center">
                     <div className="text-lg font-semibold text-green-600 mb-2">
-                      {user.preferences.activeDietPlan}
+                      {activeDietPlan
+                        ? activeDietPlan.name
+                        : loading
+                        ? "Loading diet plan..."
+                        : "Diet plan not found"}
                     </div>
+                    {activeDietPlan && activeDietPlan.description && (
+                      <p className="text-sm text-gray-500 mb-2">
+                        {activeDietPlan.description}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-600">Currently Following</p>
                     {user.preferences.dietPlanStartDate && (
                       <p className="text-xs text-gray-500 mt-1">

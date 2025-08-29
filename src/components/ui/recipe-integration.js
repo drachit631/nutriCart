@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useSubscription } from "../../contexts/SubscriptionContext";
 import { useCart } from "../../contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { recipesAPI, productsAPI } from "../../services/api";
+import {
+  canAccessContent,
+  getTierDisplayName,
+} from "../../utils/subscriptionUtils";
 
 const RecipeIntegration = () => {
   const { user, isAuthenticated } = useAuth();
+  const { subscription } = useSubscription();
   const { cart, addToCart, removeFromCart, updateQuantity } = useCart();
   const navigate = useNavigate();
 
@@ -350,6 +356,24 @@ const RecipeIntegration = () => {
                       <span>📊</span>
                       <span>{recipe.difficulty || "Easy"}</span>
                     </span>
+                    <span
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium ${
+                        recipe.subscriptionTier === "free"
+                          ? "bg-green-100 text-green-800"
+                          : recipe.subscriptionTier === "premium"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-purple-100 text-purple-800"
+                      }`}
+                    >
+                      <span>
+                        {recipe.subscriptionTier === "free"
+                          ? "🌟"
+                          : recipe.subscriptionTier === "premium"
+                          ? "💎"
+                          : "👑"}
+                      </span>
+                      <span>{getTierDisplayName(recipe.subscriptionTier)}</span>
+                    </span>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-6">
@@ -381,25 +405,46 @@ const RecipeIntegration = () => {
                   </div>
 
                   <div className="flex space-x-4">
-                    <button
-                      onClick={() => {
-                        console.log(
-                          "Clicking LEARN MORE for recipe:",
-                          recipe.name,
-                          "with ID:",
-                          recipe._id
-                        );
-                        if (recipe._id) {
-                          handleLearnMore(recipe._id);
-                        } else {
-                          console.error("Recipe missing _id:", recipe);
-                          alert("Recipe data error. Please try again.");
-                        }
-                      }}
-                      className="w-full bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors font-medium"
-                    >
-                      LEARN MORE
-                    </button>
+                    {canAccessContent(subscription, recipe.subscriptionTier) ? (
+                      <button
+                        onClick={() => {
+                          console.log(
+                            "Clicking VIEW FULL RECIPE for recipe:",
+                            recipe.name,
+                            "with ID:",
+                            recipe._id
+                          );
+                          if (recipe._id) {
+                            handleLearnMore(recipe._id);
+                          } else {
+                            console.error("Recipe missing _id:", recipe);
+                            alert("Recipe data error. Please try again.");
+                          }
+                        }}
+                        className="w-full bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors font-medium"
+                      >
+                        VIEW FULL RECIPE
+                      </button>
+                    ) : (
+                      <div className="w-full flex flex-col space-y-2">
+                        <button
+                          disabled
+                          className="w-full bg-gray-300 text-gray-600 px-6 py-3 rounded-lg cursor-not-allowed font-medium"
+                        >
+                          🔒{" "}
+                          {recipe.subscriptionTier === "premium"
+                            ? "Premium"
+                            : "Pro"}{" "}
+                          Recipe
+                        </button>
+                        <button
+                          onClick={() => navigate("/pricing")}
+                          className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                        >
+                          Upgrade to Access
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

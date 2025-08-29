@@ -58,8 +58,10 @@ export const SubscriptionProvider = ({ children }) => {
       // Update user subscription in backend
       if (user?.id) {
         try {
+          const baseUrl =
+            process.env.REACT_APP_API_BASE_URL || "http://localhost:4000/api";
           const response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/users/${user.id}/subscription`,
+            `${baseUrl}/users/${user.id}/subscription`,
             {
               method: "PUT",
               headers: {

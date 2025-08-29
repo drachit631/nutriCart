@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { useCart } from "../contexts/CartContext";
 import { Button } from "../components/ui/button";
 import {
@@ -11,10 +13,16 @@ import {
 import { Badge } from "../components/ui/badge";
 import { toast } from "../components/ui/use-toast";
 import { recipesAPI } from "../services/api";
+import {
+  canAccessContent,
+  getTierDisplayName,
+} from "../utils/subscriptionUtils";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated, user } = useAuth();
+  const { subscription } = useSubscription();
   const { cart } = useCart();
   const navigate = useNavigate();
 
@@ -120,16 +128,60 @@ export default function RecipesPage() {
                       ))}
                     </div>
                   )}
+
+                  {/* Subscription Tier Badge */}
+                  <div className="flex justify-end">
+                    <Badge
+                      variant={
+                        recipe.subscriptionTier === "free"
+                          ? "secondary"
+                          : recipe.subscriptionTier === "premium"
+                          ? "default"
+                          : "destructive"
+                      }
+                      className={
+                        recipe.subscriptionTier === "free"
+                          ? "bg-green-100 text-green-800"
+                          : recipe.subscriptionTier === "premium"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-purple-100 text-purple-800"
+                      }
+                    >
+                      {getTierDisplayName(recipe.subscriptionTier)}
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Action Button */}
-                <Button
-                  onClick={() => navigate(`/recipes/${recipe._id}`)}
-                  variant="gradient"
-                  className="w-full"
-                >
-                  VIEW FULL RECIPE
-                </Button>
+                {canAccessContent(subscription, recipe.subscriptionTier) ? (
+                  <Button
+                    onClick={() => navigate(`/recipes/${recipe._id}`)}
+                    variant="gradient"
+                    className="w-full"
+                  >
+                    VIEW FULL RECIPE
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Button
+                      disabled
+                      className="w-full bg-gray-300 cursor-not-allowed"
+                    >
+                      <span className="mr-2">🔒</span>
+                      {recipe.subscriptionTier === "premium"
+                        ? "Premium"
+                        : "Pro"}{" "}
+                      Recipe
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate("/pricing")}
+                      className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+                    >
+                      Upgrade to Access
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
